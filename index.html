@@ -249,22 +249,32 @@ async function fetchData() {
   const dot = document.getElementById('status-dot'), txt = document.getElementById('status-text');
   
   const nmRadius = Math.round(config.radius * 0.539957);
-  
-  // استخدام وسيط CORS مع سيرفر adsb.lol الذي أثبت نجاحه
   const apiUrl = `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${nmRadius}`;
-  const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(apiUrl)}`;
-  
-  try {
-    const res = await fetch(proxyUrl);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    
-    dot.classList.add('live'); txt.textContent = 'مباشر';
-    updateAircraft(data.ac || []);
-  } catch (err) {
-    console.error(err);
-    dot.classList.remove('live'); txt.textContent = 'خطأ في الاتصال';
+
+  // قائمة بالوسطاء لتجربتهم بالتتابع
+  const proxies = [
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`,
+    `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`,
+    `https://thingproxy.freeboard.io/fetch/${apiUrl}`
+  ];
+
+  for (const proxyUrl of proxies) {
+    try {
+      const res = await fetch(proxyUrl);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      
+      dot.classList.add('live'); txt.textContent = 'مباشر';
+      updateAircraft(data.ac || []);
+      return; // نجح الاتصال، اخرج من الدالة
+    } catch (err) {
+      console.warn('فشل الوسيط:', proxyUrl);
+      // يكمل الحلقة للبحث عن الوسيط التالي
+    }
   }
+  
+  // إذا فشلت كل الوسطاء
+  dot.classList.remove('live'); txt.textContent = 'خطأ في الاتصال';
 }
 
 function updateAircraft(states) {
