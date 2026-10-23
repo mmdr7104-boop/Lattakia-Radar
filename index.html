@@ -46,19 +46,27 @@
   .source-btn {
     background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
     border-radius: 10px; padding: 10px 8px; color: #fff; font-size: 12px;
-    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
     cursor: pointer; transition: all 0.2s; font-family: inherit;
   }
-  /* جعل الزر الخامس (Ads) يأخذ عرض الشاشة بالكامل */
   .source-btn.full-width { grid-column: 1 / -1; }
   
   .source-btn:active { transform: scale(0.97); }
   .source-btn .icon { font-size: 18px; }
-  .source-btn .status { font-size: 10px; opacity: 0.6; }
+  
+  /* تعديل شكل النقطة لتكون في المنتصف بدون نص */
+  .source-btn .status { 
+    display: flex; justify-content: center; align-items: center; 
+    height: 10px; 
+  }
+  .source-btn .dot { 
+    width: 8px; height: 8px; border-radius: 50%; 
+    background: #555; display: inline-block; 
+    transition: all 0.3s;
+  }
+  
   .source-btn.active { background: rgba(0, 230, 118, 0.15); border-color: #00e676; }
-  .source-btn.active .status { color: #00e676; opacity: 1; }
-  .source-btn .dot { width: 6px; height: 6px; border-radius: 50%; background: #555; display: inline-block; margin-right: 4px; }
-  .source-btn.active .dot { background: #00e676; box-shadow: 0 0 6px #00e676; }
+  .source-btn.active .dot { background: #00e676; box-shadow: 0 0 8px #00e676; }
   
   #settings-btn {
     background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
@@ -127,26 +135,26 @@
     <div id="toggle-collapse">▼</div>
   </div>
   <div id="source-grid">
+    <!-- تم إزالة النصوص من الأزرار وإبقاء النقاط فقط -->
     <button class="source-btn active" data-source="opensky">
       <div class="icon">🌐</div><div>الإنترنت</div>
-      <div class="status"><span class="dot"></span>ADSB.lol</div>
+      <div class="status"><span class="dot"></span></div>
     </button>
     <button class="source-btn placeholder" data-source="atc">
       <div class="icon">📡</div><div>رادار ATC</div>
-      <div class="status"><span class="dot"></span>غير مهيأ</div>
+      <div class="status"><span class="dot"></span></div>
     </button>
     <button class="source-btn placeholder" data-source="ploto">
       <div class="icon">🛰️</div><div>PLOTO P-4A</div>
-      <div class="status"><span class="dot"></span>غير مهيأ</div>
+      <div class="status"><span class="dot"></span></div>
     </button>
     <button class="source-btn placeholder" data-source="near">
       <div class="icon">📶</div><div>Near Radar</div>
-      <div class="status"><span class="dot"></span>غير مهيأ</div>
+      <div class="status"><span class="dot"></span></div>
     </button>
-    <!-- الزر الجديد الخاص بـ ADS -->
     <button class="source-btn placeholder full-width" data-source="ads">
       <div class="icon">✈️</div><div>مصدر Ads</div>
-      <div class="status"><span class="dot"></span>غير مهيأ</div>
+      <div class="status"><span class="dot"></span></div>
     </button>
   </div>
 </div>
@@ -174,7 +182,6 @@ const DEFAULT_CONFIG = { name: 'مطار اللاذقية الدولي', lat: 35
 let config = JSON.parse(localStorage.getItem('radar_config') || 'null') || {...DEFAULT_CONFIG};
 
 const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([config.lat, config.lng], 9);
-// خريطة داكنة مضمونة وبدون API Key
 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 }).addTo(map);
 
 let centerMarker = null, rangeCircle = null;
@@ -244,7 +251,7 @@ async function fetchData() {
   const dot = document.getElementById('status-dot'), txt = document.getElementById('status-text');
   
   const nmRadius = Math.round(config.radius * 0.539957);
-  const url = `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${nmRadius}`;
+  const url = `https://api.airplanes.live/v2/point/${config.lat}/${config.lng}/${nmRadius}`;
   
   try {
     const res = await fetch(url);
@@ -254,7 +261,7 @@ async function fetchData() {
     updateAircraft(data.ac || []);
   } catch (err) {
     console.error(err);
-    dot.classList.remove('live'); txt.textContent = 'جاري المحاولة...';
+    dot.classList.remove('live'); txt.textContent = 'خطأ في الاتصال';
   }
 }
 
