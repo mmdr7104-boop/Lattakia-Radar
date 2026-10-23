@@ -41,22 +41,31 @@
   #toggle-collapse { font-size: 18px; transition: transform 0.3s; }
   #sources.collapsed #toggle-collapse { transform: rotate(180deg); }
   
-  #source-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  /* تحويل الأزرار إلى قائمة طولية */
+  #source-grid { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 8px; 
+    margin-top: 8px; 
+    max-height: 40vh; /* عشان لو الشاشة صغيرة نقدر نسكرها */
+    overflow-y: auto;
+  }
   
   .source-btn {
     background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 10px; padding: 10px 8px; color: #fff; font-size: 12px;
-    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    border-radius: 10px; padding: 12px 15px; color: #fff; font-size: 13px;
+    display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 10px;
     cursor: pointer; transition: all 0.2s; font-family: inherit;
+    width: 100%;
   }
-  .source-btn.full-width { grid-column: 1 / -1; }
   
   .source-btn:active { transform: scale(0.97); }
-  .source-btn .icon { font-size: 18px; }
+  .source-btn .icon { font-size: 20px; }
+  .source-btn .btn-text { flex: 1; text-align: right; font-weight: 500; }
   
   .source-btn .status { 
     display: flex; justify-content: center; align-items: center; 
-    height: 10px; 
+    height: 10px; width: 20px;
   }
   .source-btn .dot { 
     width: 8px; height: 8px; border-radius: 50%; 
@@ -86,11 +95,15 @@
   }
   #settings-content h2 { font-size: 16px; margin-bottom: 5px; text-align: center;}
   
+  /* تنسيق الاسم والتاريخ */
   .dev-name {
-    text-align: center; font-size: 14px; font-weight: bold; 
-    color: #00e676; margin-bottom: 20px; 
-    border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;
+    text-align: center; font-size: 15px; font-weight: bold; 
+    color: #00e676; margin-bottom: 2px; 
     font-family: monospace;
+  }
+  .dev-date {
+    text-align: center; font-size: 12px; color: #aaa; margin-bottom: 15px;
+    border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;
   }
   
   #settings-content label { font-size: 12px; display: block; margin-bottom: 4px; opacity: 0.8; margin-top: 10px;}
@@ -121,10 +134,14 @@
   .popup-row .value { font-weight: 500; }
   .leaflet-control-zoom { margin-top: 80px !important; }
   
-  .ring-label {
+  /* تنسيق النص الخاص بالدوائر ليظهر على الحافة */
+  .ring-label-marker {
     background: transparent; border: none; box-shadow: none;
-    color: #4a7c9d; font-size: 10px; font-family: monospace; font-weight: bold;
-    text-shadow: 1px 1px 2px #000;
+    color: #82a5c1; font-size: 11px; font-family: monospace; font-weight: bold;
+    text-shadow: 1px 1px 2px #000, -1px -1px 2px #000;
+    white-space: nowrap;
+    margin-left: 50%;
+    transform: translateX(-50%);
   }
 </style>
 </head>
@@ -138,9 +155,8 @@
     <div class="subtitle" id="center-label">مطار اللاذقية الدولي</div>
   </div>
   <div style="display:flex; gap:6px; align-items:center;">
-    <div id="status" style="margin-left: 5px;"><div id="status-dot"></div><span id="status-text">غير متصل</span></div>
+    <div id="status" style="margin-left: 5px;"><div id="status-dot"></div><span id="status-text">جاري الاتصال...</span></div>
     
-    <!-- زر تبديل الخريطة -->
     <button class="top-btn" id="toggle-map-btn" title="تبديل نمط الخريطة">🌍</button>
     <button class="top-btn" id="toggle-rings-btn" title="إخفاء/إظهار الدوائر">🎯</button>
     <button class="top-btn" id="settings-btn">⚙️</button>
@@ -154,33 +170,52 @@
     <div id="toggle-collapse">▼</div>
   </div>
   <div id="source-grid">
-    <button class="source-btn active" data-source="opensky">
-      <div class="icon">🌐</div><div>الإنترنت</div>
-      <div class="status"><span class="dot"></span></div>
-    </button>
+    
+    <!-- 1. محطة الرادار الدولية (الزر الأول) -->
     <button class="source-btn placeholder" data-source="atc">
-      <div class="icon">📡</div><div>رادار ATC</div>
+      <div class="icon">📡</div>
+      <div class="btn-text">محطة الرادار الدولية مطار اللاذقية</div>
       <div class="status"><span class="dot"></span></div>
     </button>
+    
+    <!-- 2. معلومات بلوتو -->
     <button class="source-btn placeholder" data-source="ploto">
-      <div class="icon">🛰️</div><div>PLOTO P-4A</div>
+      <div class="icon">🛰️</div>
+      <div class="btn-text">معلومات بلوتو PA4</div>
       <div class="status"><span class="dot"></span></div>
     </button>
+    
+    <!-- 3. Near Radar -->
     <button class="source-btn placeholder" data-source="near">
-      <div class="icon">📶</div><div>Near Radar</div>
+      <div class="icon">📶</div>
+      <div class="btn-text">Near Radar</div>
       <div class="status"><span class="dot"></span></div>
     </button>
-    <button class="source-btn placeholder full-width" data-source="ads">
-      <div class="icon">✈️</div><div>مصدر Ads</div>
+    
+    <!-- 4. مصدر Ads -->
+    <button class="source-btn placeholder" data-source="ads">
+      <div class="icon">✈️</div>
+      <div class="btn-text">مصدر Ads</div>
       <div class="status"><span class="dot"></span></div>
     </button>
+
+    <!-- 5. بيانات الشبكة (الإنترنت سابقاً - الزر الأخير) -->
+    <button class="source-btn active" data-source="opensky">
+      <div class="icon">🌐</div>
+      <div class="btn-text">بيانات الشبكة</div>
+      <div class="status"><span class="dot"></span></div>
+    </button>
+
   </div>
 </div>
 
 <div id="settings-modal">
   <div id="settings-content">
     <h2>⚙️ إعدادات مركز السمت</h2>
+    
+    <!-- الاسم والتاريخ -->
     <div class="dev-name">Eng.Modar Hasan</div>
+    <div class="dev-date">5/10/2023</div>
 
     <label>اسم الموقع</label>
     <input type="text" id="input-name" value="مطار اللاذقية الدولي">
@@ -214,17 +249,14 @@ if (config.darkMap === undefined) config.darkMap = true;
 
 const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([config.lat, config.lng], 9);
 
-// تعريف الخرائط
 const darkMapLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 });
 const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 });
 
-// تفعيل الخريطة المحفوظة
-let currentMapLayer;
 if (config.darkMap) {
-  currentMapLayer = darkMapLayer.addTo(map);
+  darkMapLayer.addTo(map);
 } else {
-  currentMapLayer = satelliteLayer.addTo(map);
-  document.getElementById('toggle-map-btn').style.opacity = '0.6'; // تغميق الزر قليلاً في وضع الأقمار
+  satelliteLayer.addTo(map);
+  document.getElementById('toggle-map-btn').style.opacity = '0.6';
 }
 
 let centerMarker = null, rangeCircle = null, rangeRings = [];
@@ -270,15 +302,19 @@ function drawRings() {
       fill: false,
       dashArray: '3, 6'
     }).addTo(map);
-
-    circle.bindTooltip(d + ' كم', { 
-      permanent: true, 
-      direction: 'right', 
-      className: 'ring-label',
-      offset: [5, 0]
-    });
-    
     rangeRings.push(circle);
+
+    const labelLat = config.lat + (d / 111.32); 
+    const labelMarker = L.marker([labelLat, config.lng], {
+      icon: L.divIcon({ 
+        className: 'ring-label-marker', 
+        html: `<div>${d}</div>`,
+        iconSize: [20, 10],
+        iconAnchor: [10, 5]
+      }),
+      interactive: false
+    }).addTo(map);
+    rangeRings.push(labelMarker);
   }
   
   if (centerMarker) centerMarker.bringToFront();
@@ -288,7 +324,6 @@ if (!config.showRings) {
   document.getElementById('toggle-rings-btn').style.opacity = '0.4';
 }
 
-// زر تبديل الخريطة (داكن / أقمار صناعية)
 document.getElementById('toggle-map-btn').addEventListener('click', () => {
   config.darkMap = !config.darkMap;
   localStorage.setItem('radar_config', JSON.stringify(config));
@@ -302,8 +337,6 @@ document.getElementById('toggle-map-btn').addEventListener('click', () => {
     map.addLayer(satelliteLayer);
     document.getElementById('toggle-map-btn').style.opacity = '0.6';
   }
-  
-  // إعادة رسم المركز والدوائر لتظهر فوق الخريطة الجديدة
   if (centerMarker) centerMarker.bringToFront();
 });
 
