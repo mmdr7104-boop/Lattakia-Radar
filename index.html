@@ -118,7 +118,7 @@
     <div class="subtitle" id="center-label">مطار اللاذقية الدولي</div>
   </div>
   <div style="display:flex; gap:6px; align-items:center;">
-    <div id="status" style="margin-left: 5px;"><div id="status-dot"></div><span id="status-text">جاري الاتصال...</span></div>
+    <div id="status" style="margin-left: 5px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><div id="status-dot"></div><span id="status-text">جاري الاتصال...</span></div>
     <button class="top-btn" id="toggle-map-btn" title="تبديل نمط الخريطة">🌍</button>
     <button class="top-btn" id="toggle-rings-btn" title="إخفاء/إظهار الدوائر">🎯</button>
     <button class="top-btn" id="settings-btn">⚙️</button>
@@ -292,26 +292,23 @@ async function fetchData() {
   try {
     const res = await fetch(proxyUrl, { signal: controller.signal });
     clearTimeout(timeoutId);
-    if (!res.ok) throw new Error('HTTP Error: ' + res.status);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     
-    const text = await res.text(); 
-    
-    if(text.includes("Hello World")) {
-       throw new Error("الوسيط يرجع Hello World. يرجى الضغط على Deploy في Cloudflare.");
-    }
-    
-    const data = JSON.parse(text);
+    const data = await res.json();
     dot.classList.add('live'); txt.textContent = 'مباشر';
     updateAircraft(data.ac || []);
   } catch (err) {
     clearTimeout(timeoutId);
     console.error(err);
-    dot.classList.remove('live'); txt.textContent = 'خطأ';
+    dot.classList.remove('live');
     
+    // التشخيص على الشاشة بدل النافذة المنبثقة
     if (err.name === 'AbortError') {
-      alert('انتهى وقت الاتصال (Timeout)!\nهذا يعني أن السيرفر بطيء جداً أو الإنترنت ضعيف.');
+      txt.textContent = 'انتهى الوقت';
+      txt.style.color = '#ff4444';
     } else {
-      alert('حدث خطأ:\n' + err.message);
+      txt.textContent = 'خطأ: ' + err.message;
+      txt.style.color = '#ff4444';
     }
   }
 }
@@ -354,6 +351,7 @@ document.querySelectorAll('.source-btn').forEach(btn => {
         aircraftMarkers.clear();
         document.getElementById('status-dot').classList.remove('live');
         document.getElementById('status-text').textContent = 'متوقف';
+        document.getElementById('status-text').style.color = '#fff';
       }
     }
   });
