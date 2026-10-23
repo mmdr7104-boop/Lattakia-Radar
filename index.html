@@ -1,3 +1,9 @@
+<!--
+  All Rights Reserved © 2023.
+  Developed by: Eng. Modar Hasan.
+  This code is the intellectual property of the developer. 
+  Unauthorized copying, modification, or distribution is strictly prohibited.
+-->
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -17,8 +23,7 @@
     color: #fff; padding: 8px 10px;
     display: flex; justify-content: space-between; align-items: center;
     box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-    flex-wrap: wrap; /* لضمان عدم خروج الأزرار عن الشاشة */
-    gap: 5px;
+    flex-wrap: wrap; gap: 5px;
   }
   #topbar h1 { font-size: 13px; font-weight: 600; }
   #topbar .subtitle { font-size: 10px; opacity: 0.7; }
@@ -68,6 +73,7 @@
     display: flex; justify-content: center; align-items: center;
   }
   .top-btn:active { transform: scale(0.95); }
+  .top-btn:disabled { opacity: 0.3; cursor: not-allowed; }
   
   #settings-modal {
     position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,0.7);
@@ -93,6 +99,7 @@
   .modal-buttons button { flex: 1; padding: 12px; border-radius: 8px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
   .btn-primary { background: #00e676; color: #0a1628; }
   .btn-secondary { background: rgba(255,255,255,0.1); color: #fff; }
+  .btn-danger { background: #ff4444; color: #fff; margin-top: 15px; width: 100%; font-size: 12px;}
   
   .leaflet-popup-content-wrapper { background: #0a1628; color: #fff; border-radius: 12px; font-family: inherit; }
   .leaflet-popup-tip { background: #0a1628; }
@@ -126,12 +133,10 @@
     <div class="subtitle" id="center-label">مطار اللاذقية الدولي</div>
   </div>
   <div style="display:flex; gap:5px; align-items:center;">
-    <div id="status" style="margin-left: 2px; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><div id="status-dot"></div><span id="status-text">جاري...</span></div>
+    <div id="status" style="margin-left: 2px; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><div id="status-dot"></div><span id="status-text">جاري...</span></div>
     <button class="top-btn" id="refresh-btn" title="تحديث البيانات">🔄</button>
-    <button class="top-btn" id="clear-cache-btn" title="مسح الكاش">🧹</button>
     <button class="top-btn" id="toggle-map-btn" title="تبديل الخريطة">🌍</button>
     <button class="top-btn" id="toggle-rings-btn" title="الدوائر">🎯</button>
-    <!-- زر الكريدورات الجوية -->
     <button class="top-btn" id="toggle-airways-btn" title="الممرات الجوية">🛫</button>
     <button class="top-btn" id="settings-btn">⚙️</button>
   </div>
@@ -183,7 +188,13 @@
       <button class="btn-secondary" onclick="closeSettings()">إلغاء</button>
       <button class="btn-primary" onclick="saveSettings()">حفظ</button>
     </div>
+    <button class="btn-danger" onclick="clearCache()">🧹 مسح الكاش وإعادة التشغيل (للمطور)</button>
   </div>
+</div>
+
+<!-- شريط حقوق النشر في أسفل الشاشة -->
+<div style="position: absolute; bottom: 50px; width: 100%; text-align: center; color: rgba(255,255,255,0.3); font-size: 10px; z-index: 1000; pointer-events: none; font-family: monospace;">
+  © 2023 Eng. Modar Hasan - All Rights Reserved
 </div>
 
 <script>
@@ -206,11 +217,10 @@ if (config.darkMap) { darkMapLayer.addTo(map); } else { satelliteLayer.addTo(map
 // ==========================================
 const airwaysLayer = L.layerGroup().addTo(map);
 
-// إحداثيات تقريبية للممرات الجوية والنقاط فوق سوريا والمنطقة
 const airwaysData = [
-  { name: "UL620", coords: [[36.2, 35.5], [35.4, 35.9], [34.5, 36.0], [33.5, 35.8]], color: "#ff9800" }, // لاذقية - بيروت
-  { name: "UR219", coords: [[37.0, 36.5], [36.0, 36.3], [35.4, 35.9], [34.0, 36.5], [32.0, 36.5]], color: "#29b6f6" }, // حلب - عمان
-  { name: "UP60", coords: [[36.5, 32.0], [36.0, 34.0], [35.4, 35.9], [35.2, 36.5], [35.0, 38.0]], color: "#ab47bc" } // قبرص - الرقة
+  { name: "UL620", coords: [[36.2, 35.5], [35.4, 35.9], [34.5, 36.0], [33.5, 35.8]], color: "#ff9800" },
+  { name: "UR219", coords: [[37.0, 36.5], [36.0, 36.3], [35.4, 35.9], [34.0, 36.5], [32.0, 36.5]], color: "#29b6f6" },
+  { name: "UP60", coords: [[36.5, 32.0], [36.0, 34.0], [35.4, 35.9], [35.2, 36.5], [35.0, 38.0]], color: "#ab47bc" }
 ];
 
 const waypoints = [
@@ -224,37 +234,18 @@ function drawAirways() {
   airwaysLayer.clearLayers();
   if (!config.showAirways) return;
 
-  // رسم الخطوط
   airwaysData.forEach(airway => {
-    const polyline = L.polyline(airway.coords, {
-      color: airway.color,
-      weight: 2,
-      opacity: 0.6,
-      dashArray: '8, 8'
-    }).addTo(airwaysLayer);
-    
-    // إضافة اسم الممر في منتصفه
+    L.polyline(airway.coords, { color: airway.color, weight: 2, opacity: 0.6, dashArray: '8, 8' }).addTo(airwaysLayer);
     const midPoint = airway.coords[Math.floor(airway.coords.length / 2)];
-    L.marker(midPoint, {
-      icon: L.divIcon({ className: 'waypoint-label', html: airway.name, iconSize: [50, 20], iconAnchor: [25, 10] }),
-      interactive: false
-    }).addTo(airwaysLayer);
+    L.marker(midPoint, { icon: L.divIcon({ className: 'waypoint-label', html: airway.name, iconSize: [50, 20], iconAnchor: [25, 10] }), interactive: false }).addTo(airwaysLayer);
   });
 
-  // رسم النقاط الملاحية
   waypoints.forEach(wp => {
-    L.circleMarker([wp.lat, wp.lng], {
-      radius: 4, color: '#ffca28', weight: 2, fillColor: '#000', fillOpacity: 1
-    }).addTo(airwaysLayer);
-    
-    L.marker([wp.lat, wp.lng], {
-      icon: L.divIcon({ className: 'waypoint-label', html: wp.name, iconSize: [80, 20], iconAnchor: [40, -5] }),
-      interactive: false
-    }).addTo(airwaysLayer);
+    L.circleMarker([wp.lat, wp.lng], { radius: 4, color: '#ffca28', weight: 2, fillColor: '#000', fillOpacity: 1 }).addTo(airwaysLayer);
+    L.marker([wp.lat, wp.lng], { icon: L.divIcon({ className: 'waypoint-label', html: wp.name, iconSize: [80, 20], iconAnchor: [40, -5] }), interactive: false }).addTo(airwaysLayer);
   });
 }
 
-// زر إظهار/إخفاء الكريدورات
 document.getElementById('toggle-airways-btn').addEventListener('click', () => {
   config.showAirways = !config.showAirways;
   localStorage.setItem('radar_config', JSON.stringify(config));
@@ -320,19 +311,26 @@ document.getElementById('toggle-rings-btn').addEventListener('click', () => {
   drawRings();
 });
 
-document.getElementById('refresh-btn').addEventListener('click', fetchData);
+// زر التحديث اليدوي (محمي من الدق المتكرر)
+const refreshBtn = document.getElementById('refresh-btn');
+refreshBtn.addEventListener('click', () => {
+  fetchData();
+  refreshBtn.disabled = true;
+  refreshBtn.style.opacity = '0.3';
+  setTimeout(() => { refreshBtn.disabled = false; refreshBtn.style.opacity = '1'; }, 5000);
+});
 
-document.getElementById('clear-cache-btn').addEventListener('click', () => {
+function clearCache() {
   localStorage.clear();
   sessionStorage.clear();
   window.location.replace(window.location.pathname + '?v=' + Date.now());
-});
+}
 
 // ==========================================
 // إدارة الطائرات والمسارات (Trails)
 // ==========================================
 const aircraftMarkers = new Map();
-const aircraftTrails = new Map(); // لتخزين مسار كل طائرة
+const aircraftTrails = new Map();
 const activeSources = { opensky: true, atc: false, ploto: false, near: false, ads: false };
 
 function aircraftIcon(heading, onGround) {
@@ -369,7 +367,8 @@ function popupContent(s) {
   `;
 }
 
-function fetchData() {
+// ** التبديل التلقائي بين المصادر مع منع الكاش **
+async function fetchData() {
   if (!activeSources.opensky) return;
   const dot = document.getElementById('status-dot'), txt = document.getElementById('status-text');
   
@@ -377,46 +376,49 @@ function fetchData() {
   txt.style.color = '#fff';
 
   const nmRadius = Math.round(config.radius * 0.539957);
-  const apiUrl = `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${nmRadius}`;
-  const proxyUrl = `https://radarl.mmdr7104.workers.dev/?url=${encodeURIComponent(apiUrl)}&t=${Date.now()}`;
   
-  const xhr = new XMLHttpRequest();
-  xhr.open('GET', proxyUrl, true);
-  xhr.timeout = 8000; 
+  const sources = [
+    { name: 'adsb.lol', url: `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${nmRadius}` },
+    { name: 'adsb.fi', url: `https://opendata.adsb.fi/api/v2/point/${config.lat}/${config.lng}/${nmRadius}` },
+    { name: 'airplanes.live', url: `https://api.airplanes.live/v2/point/${config.lat}/${config.lng}/${nmRadius}` }
+  ];
 
-  xhr.onload = function() {
-    if (xhr.status === 200) {
-      try {
-        const data = JSON.parse(xhr.responseText);
-        dot.classList.add('live'); 
-        txt.textContent = 'مباشر';
-        txt.style.color = '#00e676';
-        updateAircraft(data.ac || []);
-      } catch (e) {
-        dot.classList.remove('live'); 
-        txt.textContent = 'خطأ بالبيانات';
-        txt.style.color = '#ff4444';
-      }
-    } else {
-      dot.classList.remove('live'); 
-      txt.textContent = 'خطأ HTTP:' + xhr.status;
-      txt.style.color = '#ff4444';
+  let success = false;
+  let lastError = '';
+
+  for (let i = 0; i < sources.length; i++) {
+    try {
+      // إضافة &cb=${Date.now()} لكسر الكاش وإجبار المتصفح على جلب بيانات جديدة
+      const proxyUrl = `https://radarl.mmdr7104.workers.dev/?url=${encodeURIComponent(sources[i].url)}&cb=${Date.now()}`;
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2500); // 2.5 ثانية مهلة
+      
+      const res = await fetch(proxyUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      
+      const data = await res.json();
+      
+      dot.classList.add('live'); 
+      txt.textContent = 'مباشر - ' + sources[i].name; 
+      txt.style.color = '#00e676';
+      updateAircraft(data.ac || []);
+      success = true;
+      break; 
+      
+    } catch (err) {
+      console.warn(`فشل المصدر ${sources[i].name}:`, err.message);
+      lastError = err.message;
     }
-  };
+  }
 
-  xhr.onerror = function() {
+  if (!success) {
     dot.classList.remove('live'); 
-    txt.textContent = 'فشل الاتصال';
+    txt.textContent = 'فشل الاتصال (' + lastError + ')';
     txt.style.color = '#ff4444';
-  };
-
-  xhr.ontimeout = function() {
-    dot.classList.remove('live'); 
-    txt.textContent = 'انتهى الوقت';
-    txt.style.color = '#ff4444';
-  };
-
-  xhr.send();
+  }
 }
 
 function updateAircraft(states) {
@@ -433,37 +435,32 @@ function updateAircraft(states) {
     }
     const trailData = aircraftTrails.get(icao24);
     
-    // إضافة نقطة جديدة إذا تحركت الطائرة (لمنع تكرار نفس النقطة)
     const lastPoint = trailData.points[trailData.points.length - 1];
     if (!lastPoint || (lastPoint[0] !== s.lat || lastPoint[1] !== s.lon)) {
       trailData.points.push([s.lat, s.lon]);
       
-      // رسم أو تحديث الخط
+      // تحديد طول المسار بـ 30 نقطة فقط لتخفيف المعالجة
+      if (trailData.points.length > 30) { trailData.points.shift(); }
+
       if (trailData.line) {
         trailData.line.setLatLngs(trailData.points);
       } else {
-        trailData.line = L.polyline(trailData.points, {
-          color: '#00e676', weight: 2, opacity: 0.4, dashArray: '5, 5'
-        }).addTo(map);
+        trailData.line = L.polyline(trailData.points, { color: '#00e676', weight: 2, opacity: 0.4, dashArray: '5, 5' }).addTo(map);
       }
     }
 
     if (aircraftMarkers.has(icao24)) {
       const m = aircraftMarkers.get(icao24);
-      m.setLatLng([s.lat, s.lon]); 
-      m.setIcon(icon); 
-      m.setPopupContent(popupContent(s));
+      m.setLatLng([s.lat, s.lon]); m.setIcon(icon); m.setPopupContent(popupContent(s));
     } else {
       const m = L.marker([s.lat, s.lon], { icon }).bindPopup(popupContent(s)).addTo(map);
       aircraftMarkers.set(icao24, m);
     }
   }
   
-  // حذف الطائرات التي اختفت من الشاشة (ومسارها)
   for (const [k, m] of aircraftMarkers.entries()) {
     if (!seen.has(k)) { 
-      map.removeLayer(m); 
-      aircraftMarkers.delete(k); 
+      map.removeLayer(m); aircraftMarkers.delete(k); 
       if (aircraftTrails.has(k)) {
         const trail = aircraftTrails.get(k);
         if (trail.line) map.removeLayer(trail.line);
@@ -526,7 +523,7 @@ document.getElementById('settings-btn').addEventListener('click', openSettings);
 
 drawCenter();
 fetchData();
-setInterval(fetchData, 10000); 
+setInterval(fetchData, 15000); 
 </script>
 </body>
 </html>
