@@ -67,11 +67,12 @@
   .source-btn.active { background: rgba(0, 230, 118, 0.15); border-color: #00e676; }
   .source-btn.active .dot { background: #00e676; box-shadow: 0 0 8px #00e676; }
   
-  #settings-btn {
+  .top-btn {
     background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
     border-radius: 8px; padding: 6px 10px; color: #fff; font-size: 14px;
-    cursor: pointer; font-family: inherit;
+    cursor: pointer; font-family: inherit; transition: opacity 0.2s;
   }
+  .top-btn:active { transform: scale(0.95); }
   
   #settings-modal {
     position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,0.7);
@@ -81,9 +82,18 @@
   #settings-content {
     background: #1a2f4a; color: #fff; border-radius: 16px;
     padding: 20px; width: 100%; max-width: 400px;
+    max-height: 90vh; overflow-y: auto;
   }
-  #settings-content h2 { font-size: 16px; margin-bottom: 15px; }
-  #settings-content label { font-size: 12px; display: block; margin-bottom: 4px; opacity: 0.8; }
+  #settings-content h2 { font-size: 16px; margin-bottom: 5px; text-align: center;}
+  
+  .dev-name {
+    text-align: center; font-size: 14px; font-weight: bold; 
+    color: #00e676; margin-bottom: 20px; 
+    border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;
+    font-family: monospace;
+  }
+  
+  #settings-content label { font-size: 12px; display: block; margin-bottom: 4px; opacity: 0.8; margin-top: 10px;}
   #settings-content input {
     width: 100%; padding: 10px; border-radius: 8px;
     border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05);
@@ -110,6 +120,12 @@
   .popup-row .label { opacity: 0.6; }
   .popup-row .value { font-weight: 500; }
   .leaflet-control-zoom { margin-top: 80px !important; }
+  
+  .ring-label {
+    background: transparent; border: none; box-shadow: none;
+    color: #4a7c9d; font-size: 10px; font-family: monospace; font-weight: bold;
+    text-shadow: 1px 1px 2px #000;
+  }
 </style>
 </head>
 <body>
@@ -121,9 +137,13 @@
     <h1>🛩️ مراقبة الحركة الجوية</h1>
     <div class="subtitle" id="center-label">مطار اللاذقية الدولي</div>
   </div>
-  <div style="display:flex; gap:8px; align-items:center;">
-    <div id="status"><div id="status-dot"></div><span id="status-text">غير متصل</span></div>
-    <button id="settings-btn">⚙️</button>
+  <div style="display:flex; gap:6px; align-items:center;">
+    <div id="status" style="margin-left: 5px;"><div id="status-dot"></div><span id="status-text">غير متصل</span></div>
+    
+    <!-- زر تبديل الخريطة -->
+    <button class="top-btn" id="toggle-map-btn" title="تبديل نمط الخريطة">🌍</button>
+    <button class="top-btn" id="toggle-rings-btn" title="إخفاء/إظهار الدوائر">🎯</button>
+    <button class="top-btn" id="settings-btn">⚙️</button>
   </div>
 </div>
 
@@ -160,14 +180,23 @@
 <div id="settings-modal">
   <div id="settings-content">
     <h2>⚙️ إعدادات مركز السمت</h2>
+    <div class="dev-name">Eng.Modar Hasan</div>
+
     <label>اسم الموقع</label>
     <input type="text" id="input-name" value="مطار اللاذقية الدولي">
+    
     <label>خط العرض (Latitude)</label>
     <input type="number" id="input-lat" step="0.0001" value="35.4011">
+    
     <label>خط الطول (Longitude)</label>
     <input type="number" id="input-lng" step="0.0001" value="35.9486">
-    <label>مدى الرادار (كم)</label>
+    
+    <label>مدى الرادار الكلي (كم)</label>
     <input type="number" id="input-radius" step="10" value="250">
+    
+    <label>المسافة بين الدوائر (كم)</label>
+    <input type="number" id="input-ring-interval" step="10" value="50">
+    
     <div class="modal-buttons">
       <button class="btn-secondary" onclick="closeSettings()">إلغاء</button>
       <button class="btn-primary" onclick="saveSettings()">حفظ</button>
@@ -176,16 +205,34 @@
 </div>
 
 <script>
-const DEFAULT_CONFIG = { name: 'مطار اللاذقية الدولي', lat: 35.4011, lng: 35.9486, radius: 250 };
+const DEFAULT_CONFIG = { name: 'مطار اللاذقية الدولي', lat: 35.4011, lng: 35.9486, radius: 250, ringInterval: 50, showRings: true, darkMap: true };
 let config = JSON.parse(localStorage.getItem('radar_config') || 'null') || {...DEFAULT_CONFIG};
 
-const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([config.lat, config.lng], 9);
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 }).addTo(map);
+if (config.ringInterval === undefined) config.ringInterval = 50;
+if (config.showRings === undefined) config.showRings = true;
+if (config.darkMap === undefined) config.darkMap = true;
 
-let centerMarker = null, rangeCircle = null;
+const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([config.lat, config.lng], 9);
+
+// تعريف الخرائط
+const darkMapLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 });
+const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 });
+
+// تفعيل الخريطة المحفوظة
+let currentMapLayer;
+if (config.darkMap) {
+  currentMapLayer = darkMapLayer.addTo(map);
+} else {
+  currentMapLayer = satelliteLayer.addTo(map);
+  document.getElementById('toggle-map-btn').style.opacity = '0.6'; // تغميق الزر قليلاً في وضع الأقمار
+}
+
+let centerMarker = null, rangeCircle = null, rangeRings = [];
+
 function drawCenter() {
   if (centerMarker) map.removeLayer(centerMarker);
   if (rangeCircle) map.removeLayer(rangeCircle);
+  
   const svg = `<svg width="30" height="30" viewBox="0 0 30 30">
     <circle cx="15" cy="15" r="12" fill="none" stroke="#00e676" stroke-width="1.5" opacity="0.4"/>
     <circle cx="15" cy="15" r="6" fill="none" stroke="#00e676" stroke-width="1.5" opacity="0.7"/>
@@ -198,13 +245,74 @@ function drawCenter() {
   centerMarker = L.marker([config.lat, config.lng], {
     icon: L.divIcon({ html: svg, className: '', iconSize: [30,30], iconAnchor: [15,15] })
   }).addTo(map);
+  
   rangeCircle = L.circle([config.lat, config.lng], {
     radius: config.radius * 1000, color: '#00e676', weight: 1, opacity: 0.3,
     fillColor: '#00e676', fillOpacity: 0.03, dashArray: '5, 10'
   }).addTo(map);
+  
   document.getElementById('center-label').textContent = config.name;
+  drawRings();
 }
-drawCenter();
+
+function drawRings() {
+  rangeRings.forEach(r => map.removeLayer(r));
+  rangeRings = [];
+
+  if (!config.showRings || config.ringInterval <= 0) return;
+
+  for (let d = config.ringInterval; d < config.radius; d += config.ringInterval) {
+    const circle = L.circle([config.lat, config.lng], {
+      radius: d * 1000,
+      color: '#4a7c9d', 
+      weight: 1,
+      opacity: 0.5,
+      fill: false,
+      dashArray: '3, 6'
+    }).addTo(map);
+
+    circle.bindTooltip(d + ' كم', { 
+      permanent: true, 
+      direction: 'right', 
+      className: 'ring-label',
+      offset: [5, 0]
+    });
+    
+    rangeRings.push(circle);
+  }
+  
+  if (centerMarker) centerMarker.bringToFront();
+}
+
+if (!config.showRings) {
+  document.getElementById('toggle-rings-btn').style.opacity = '0.4';
+}
+
+// زر تبديل الخريطة (داكن / أقمار صناعية)
+document.getElementById('toggle-map-btn').addEventListener('click', () => {
+  config.darkMap = !config.darkMap;
+  localStorage.setItem('radar_config', JSON.stringify(config));
+  
+  if (config.darkMap) {
+    map.removeLayer(satelliteLayer);
+    map.addLayer(darkMapLayer);
+    document.getElementById('toggle-map-btn').style.opacity = '1';
+  } else {
+    map.removeLayer(darkMapLayer);
+    map.addLayer(satelliteLayer);
+    document.getElementById('toggle-map-btn').style.opacity = '0.6';
+  }
+  
+  // إعادة رسم المركز والدوائر لتظهر فوق الخريطة الجديدة
+  if (centerMarker) centerMarker.bringToFront();
+});
+
+document.getElementById('toggle-rings-btn').addEventListener('click', () => {
+  config.showRings = !config.showRings;
+  localStorage.setItem('radar_config', JSON.stringify(config));
+  document.getElementById('toggle-rings-btn').style.opacity = config.showRings ? '1' : '0.4';
+  drawRings();
+});
 
 const aircraftMarkers = new Map();
 const activeSources = { opensky: true, atc: false, ploto: false, near: false, ads: false };
@@ -212,10 +320,10 @@ const activeSources = { opensky: true, atc: false, ploto: false, near: false, ad
 function aircraftIcon(heading, onGround) {
   const color = onGround ? '#ffa726' : '#00e676';
   return L.divIcon({
-    html: `<svg width="28" height="28" viewBox="0 0 24 24" style="transform: rotate(${heading||0}deg);">
-      <path d="M12 2 L14 9 L21 12 L14 12 L13 20 L16 22 L12 21 L8 22 L11 20 L10 12 L3 12 L10 9 Z" 
-            fill="${color}" stroke="#0a1628" stroke-width="0.5"/></svg>`,
-    className: '', iconSize: [28,28], iconAnchor: [14,14]
+    html: `<svg width="30" height="30" viewBox="0 0 24 24" style="transform: rotate(${heading||0}deg); filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.6));">
+      <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" 
+            fill="${color}" stroke="#0a1628" stroke-width="1"/></svg>`,
+    className: '', iconSize: [30,30], iconAnchor: [15,15]
   });
 }
 
@@ -251,7 +359,6 @@ async function fetchData() {
   const nmRadius = Math.round(config.radius * 0.539957);
   const apiUrl = `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${nmRadius}`;
   
-  // استخدام وسيط Cloudflare الخاص بك
   const proxyUrl = `https://radarl.mmdr7104.workers.dev/?url=${encodeURIComponent(apiUrl)}`;
   
   try {
@@ -315,6 +422,7 @@ function openSettings() {
   document.getElementById('input-lat').value = config.lat;
   document.getElementById('input-lng').value = config.lng;
   document.getElementById('input-radius').value = config.radius;
+  document.getElementById('input-ring-interval').value = config.ringInterval;
   document.getElementById('settings-modal').classList.add('show');
 }
 function closeSettings() { document.getElementById('settings-modal').classList.remove('show'); }
@@ -323,6 +431,10 @@ function saveSettings() {
   config.lat = parseFloat(document.getElementById('input-lat').value);
   config.lng = parseFloat(document.getElementById('input-lng').value);
   config.radius = parseFloat(document.getElementById('input-radius').value);
+  
+  let newInterval = parseFloat(document.getElementById('input-ring-interval').value);
+  config.ringInterval = (isNaN(newInterval) || newInterval <= 0) ? 50 : newInterval;
+
   localStorage.setItem('radar_config', JSON.stringify(config));
   closeSettings();
   map.setView([config.lat, config.lng], 9);
@@ -333,6 +445,7 @@ function toggleSources() { document.getElementById('sources').classList.toggle('
 
 document.getElementById('settings-btn').addEventListener('click', openSettings);
 
+drawCenter();
 fetchData();
 setInterval(fetchData, 10000); 
 </script>
