@@ -54,7 +54,6 @@
   .source-btn:active { transform: scale(0.97); }
   .source-btn .icon { font-size: 18px; }
   
-  /* تعديل شكل النقطة لتكون في المنتصف بدون نص */
   .source-btn .status { 
     display: flex; justify-content: center; align-items: center; 
     height: 10px; 
@@ -135,7 +134,6 @@
     <div id="toggle-collapse">▼</div>
   </div>
   <div id="source-grid">
-    <!-- تم إزالة النصوص من الأزرار وإبقاء النقاط فقط -->
     <button class="source-btn active" data-source="opensky">
       <div class="icon">🌐</div><div>الإنترنت</div>
       <div class="status"><span class="dot"></span></div>
@@ -246,23 +244,36 @@ function popupContent(s) {
   `;
 }
 
+// خوارزمية السيرفرات الاحتياطية (إذا فشل سيرفر، ينتقل للذي بعده)
 async function fetchData() {
   if (!activeSources.opensky) return;
   const dot = document.getElementById('status-dot'), txt = document.getElementById('status-text');
   
   const nmRadius = Math.round(config.radius * 0.539957);
-  const url = `https://api.airplanes.live/v2/point/${config.lat}/${config.lng}/${nmRadius}`;
   
-  try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    dot.classList.add('live'); txt.textContent = 'مباشر';
-    updateAircraft(data.ac || []);
-  } catch (err) {
-    console.error(err);
-    dot.classList.remove('live'); txt.textContent = 'خطأ في الاتصال';
+  const urls = [
+    `https://opendata.adsb.fi/api/v2/point/${config.lat}/${config.lng}/${nmRadius}`,
+    `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${nmRadius}`,
+    `https://api.airplanes.live/v2/point/${config.lat}/${config.lng}/${nmRadius}`
+  ];
+
+  for (const url of urls) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      
+      dot.classList.add('live'); txt.textContent = 'مباشر';
+      updateAircraft(data.ac || []);
+      return; // نجح الاتصال، اخرج من الدالة
+    } catch (err) {
+      console.warn('فشل الاتصال بـ:', url);
+      // يكمل الحلقة للبحث عن السيرفر التالي
+    }
   }
+  
+  // إذا فشلت كل السيرفرات
+  dot.classList.remove('live'); txt.textContent = 'خطأ في الاتصال';
 }
 
 function updateAircraft(states) {
