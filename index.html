@@ -118,7 +118,7 @@
     <div class="subtitle" id="center-label">مطار اللاذقية الدولي</div>
   </div>
   <div style="display:flex; gap:6px; align-items:center;">
-    <div id="status" style="margin-left: 5px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><div id="status-dot"></div><span id="status-text">جاري الاتصال...</span></div>
+    <div id="status" style="margin-left: 5px; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><div id="status-dot"></div><span id="status-text">جاري الاتصال...</span></div>
     <button class="top-btn" id="toggle-map-btn" title="تبديل نمط الخريطة">🌍</button>
     <button class="top-btn" id="toggle-rings-btn" title="إخفاء/إظهار الدوائر">🎯</button>
     <button class="top-btn" id="settings-btn">⚙️</button>
@@ -175,12 +175,12 @@
 </div>
 
 <script>
-const DEFAULT_CONFIG = { name: 'مطار اللاذقية الدولي', lat: 35.4011, lng: 35.9486, radius: 250, ringInterval: 50, showRings: true, darkMap: true };
+const DEFAULT_CONFIG = { name: 'مطار اللاذقية الدولي', lat: 35.4011, lng: 35.9486, radius: 250, ringInterval: 50, showRings: true, darkMap: false };
 let config = JSON.parse(localStorage.getItem('radar_config') || 'null') || {...DEFAULT_CONFIG};
 
 if (config.ringInterval === undefined) config.ringInterval = 50;
 if (config.showRings === undefined) config.showRings = true;
-if (config.darkMap === undefined) config.darkMap = true;
+if (config.darkMap === undefined) config.darkMap = false;
 
 const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([config.lat, config.lng], 9);
 const darkMapLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 });
@@ -278,39 +278,55 @@ function popupContent(s) {
   `;
 }
 
-async function fetchData() {
+// ** التغيير الجذري: استخدام XMLHttpRequest بدلاً من fetch لضمان الاستقرار **
+function fetchData() {
   if (!activeSources.opensky) return;
   const dot = document.getElementById('status-dot'), txt = document.getElementById('status-text');
   
+  txt.textContent = 'جاري الاتصال...';
+  txt.style.color = '#fff';
+
   const nmRadius = Math.round(config.radius * 0.539957);
   const apiUrl = `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${nmRadius}`;
   const proxyUrl = `https://radarl.mmdr7104.workers.dev/?url=${encodeURIComponent(apiUrl)}`;
   
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000); 
+  const xhr = new XMLHttpRequest();
+  xhr.open('GET', proxyUrl, true);
+  xhr.timeout = 8000; // 8 ثواني كحد أقصى للانتظار
 
-  try {
-    const res = await fetch(proxyUrl, { signal: controller.signal });
-    clearTimeout(timeoutId);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    
-    const data = await res.json();
-    dot.classList.add('live'); txt.textContent = 'مباشر';
-    updateAircraft(data.ac || []);
-  } catch (err) {
-    clearTimeout(timeoutId);
-    console.error(err);
-    dot.classList.remove('live');
-    
-    // التشخيص على الشاشة بدل النافذة المنبثقة
-    if (err.name === 'AbortError') {
-      txt.textContent = 'انتهى الوقت';
-      txt.style.color = '#ff4444';
+  xhr.onload = function() {
+    if (xhr.status === 200) {
+      try {
+        const data = JSON.parse(xhr.responseText);
+        dot.classList.add('live'); 
+        txt.textContent = 'مباشر';
+        txt.style.color = '#00e676';
+        updateAircraft(data.ac || []);
+      } catch (e) {
+        dot.classList.remove('live'); 
+        txt.textContent = 'خطأ في البيانات';
+        txt.style.color = '#ff4444';
+      }
     } else {
-      txt.textContent = 'خطأ: ' + err.message;
+      dot.classList.remove('live'); 
+      txt.textContent = 'خطأ HTTP: ' + xhr.status;
       txt.style.color = '#ff4444';
     }
-  }
+  };
+
+  xhr.onerror = function() {
+    dot.classList.remove('live'); 
+    txt.textContent = 'فشل الاتصال بالشبكة';
+    txt.style.color = '#ff4444';
+  };
+
+  xhr.ontimeout = function() {
+    dot.classList.remove('live'); 
+    txt.textContent = 'انتهى الوقت (Timeout)';
+    txt.style.color = '#ff4444';
+  };
+
+  xhr.send();
 }
 
 function updateAircraft(states) {
