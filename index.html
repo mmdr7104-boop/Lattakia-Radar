@@ -311,7 +311,6 @@ document.getElementById('toggle-rings-btn').addEventListener('click', () => {
   drawRings();
 });
 
-// زر التحديث اليدوي (محمي من الدق المتكرر)
 const refreshBtn = document.getElementById('refresh-btn');
 refreshBtn.addEventListener('click', () => {
   fetchData();
@@ -367,7 +366,7 @@ function popupContent(s) {
   `;
 }
 
-// ** التبديل التلقائي بين المصادر مع منع الكاش **
+// ** التبديل التلقائي بين المصادر مع منع الكاش تماماً **
 async function fetchData() {
   if (!activeSources.opensky) return;
   const dot = document.getElementById('status-dot'), txt = document.getElementById('status-text');
@@ -388,13 +387,14 @@ async function fetchData() {
 
   for (let i = 0; i < sources.length; i++) {
     try {
-      // إضافة &cb=${Date.now()} لكسر الكاش وإجبار المتصفح على جلب بيانات جديدة
+      // إضافة كاسر كاش في رابط الوسيط
       const proxyUrl = `https://radarl.mmdr7104.workers.dev/?url=${encodeURIComponent(sources[i].url)}&cb=${Date.now()}`;
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2500); // 2.5 ثانية مهلة
+      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 ثواني مهلة
       
-      const res = await fetch(proxyUrl, { signal: controller.signal });
+      // إجبار المتصفح على تجاهل الكاش (cache: 'no-store')
+      const res = await fetch(proxyUrl, { signal: controller.signal, cache: 'no-store' });
       clearTimeout(timeoutId);
       
       if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -439,7 +439,6 @@ function updateAircraft(states) {
     if (!lastPoint || (lastPoint[0] !== s.lat || lastPoint[1] !== s.lon)) {
       trailData.points.push([s.lat, s.lon]);
       
-      // تحديد طول المسار بـ 30 نقطة فقط لتخفيف المعالجة
       if (trailData.points.length > 30) { trailData.points.shift(); }
 
       if (trailData.line) {
