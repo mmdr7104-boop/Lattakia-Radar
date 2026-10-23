@@ -292,14 +292,27 @@ async function fetchData() {
   try {
     const res = await fetch(proxyUrl, { signal: controller.signal });
     clearTimeout(timeoutId);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
+    if (!res.ok) throw new Error('HTTP Error: ' + res.status);
+    
+    const text = await res.text(); 
+    
+    if(text.includes("Hello World")) {
+       throw new Error("الوسيط يرجع Hello World. يرجى الضغط على Deploy في Cloudflare.");
+    }
+    
+    const data = JSON.parse(text);
     dot.classList.add('live'); txt.textContent = 'مباشر';
     updateAircraft(data.ac || []);
   } catch (err) {
     clearTimeout(timeoutId);
     console.error(err);
-    dot.classList.remove('live'); txt.textContent = 'خطأ في الاتصال';
+    dot.classList.remove('live'); txt.textContent = 'خطأ';
+    
+    if (err.name === 'AbortError') {
+      alert('انتهى وقت الاتصال (Timeout)!\nهذا يعني أن السيرفر بطيء جداً أو الإنترنت ضعيف.');
+    } else {
+      alert('حدث خطأ:\n' + err.message);
+    }
   }
 }
 
@@ -329,7 +342,7 @@ document.querySelectorAll('.source-btn').forEach(btn => {
     if (btn.classList.contains('placeholder')) {
       btn.classList.add('active');
       setTimeout(() => btn.classList.remove('active'), 500);
-      alert('هذا المصدر غير مهيأ بعد.\nسيتم تفعيله في المرحلة القادمة عندما نحصل على بيانات الاتصال.');
+      alert('هذا المصدر غير مهيأ بعد.');
       return;
     }
     activeSources[src] = !activeSources[src];
