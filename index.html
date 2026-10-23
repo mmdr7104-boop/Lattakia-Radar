@@ -250,31 +250,21 @@ async function fetchData() {
   
   const nmRadius = Math.round(config.radius * 0.539957);
   const apiUrl = `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${nmRadius}`;
-
-  // قائمة بالوسطاء لتجربتهم بالتتابع
-  const proxies = [
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`,
-    `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`,
-    `https://thingproxy.freeboard.io/fetch/${apiUrl}`
-  ];
-
-  for (const proxyUrl of proxies) {
-    try {
-      const res = await fetch(proxyUrl);
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const data = await res.json();
-      
-      dot.classList.add('live'); txt.textContent = 'مباشر';
-      updateAircraft(data.ac || []);
-      return; // نجح الاتصال، اخرج من الدالة
-    } catch (err) {
-      console.warn('فشل الوسيط:', proxyUrl);
-      // يكمل الحلقة للبحث عن الوسيط التالي
-    }
-  }
   
-  // إذا فشلت كل الوسطاء
-  dot.classList.remove('live'); txt.textContent = 'خطأ في الاتصال';
+  // استخدام وسيط Cloudflare الخاص بك
+  const proxyUrl = `https://radarl.mmdr7104.workers.dev/?url=${encodeURIComponent(apiUrl)}`;
+  
+  try {
+    const res = await fetch(proxyUrl);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    
+    dot.classList.add('live'); txt.textContent = 'مباشر';
+    updateAircraft(data.ac || []);
+  } catch (err) {
+    console.error(err);
+    dot.classList.remove('live'); txt.textContent = 'خطأ في الاتصال';
+  }
 }
 
 function updateAircraft(states) {
