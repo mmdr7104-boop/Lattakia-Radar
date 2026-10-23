@@ -9,7 +9,7 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-  #map { position: absolute; inset: 0; }
+  #map { position: absolute; inset: 0; background: #0a1628; }
   
   #topbar {
     position: absolute; top: 0; left: 0; right: 0; z-index: 1000;
@@ -40,13 +40,18 @@
   #sources-header .title { font-size: 13px; font-weight: 600; }
   #toggle-collapse { font-size: 18px; transition: transform 0.3s; }
   #sources.collapsed #toggle-collapse { transform: rotate(180deg); }
+  
   #source-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  
   .source-btn {
     background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
     border-radius: 10px; padding: 10px 8px; color: #fff; font-size: 12px;
     display: flex; flex-direction: column; align-items: center; gap: 4px;
     cursor: pointer; transition: all 0.2s; font-family: inherit;
   }
+  /* جعل الزر الخامس (Ads) يأخذ عرض الشاشة بالكامل */
+  .source-btn.full-width { grid-column: 1 / -1; }
+  
   .source-btn:active { transform: scale(0.97); }
   .source-btn .icon { font-size: 18px; }
   .source-btn .status { font-size: 10px; opacity: 0.6; }
@@ -124,7 +129,7 @@
   <div id="source-grid">
     <button class="source-btn active" data-source="opensky">
       <div class="icon">🌐</div><div>الإنترنت</div>
-      <div class="status"><span class="dot"></span>OpenSky</div>
+      <div class="status"><span class="dot"></span>ADSB.lol</div>
     </button>
     <button class="source-btn placeholder" data-source="atc">
       <div class="icon">📡</div><div>رادار ATC</div>
@@ -136,6 +141,11 @@
     </button>
     <button class="source-btn placeholder" data-source="near">
       <div class="icon">📶</div><div>Near Radar</div>
+      <div class="status"><span class="dot"></span>غير مهيأ</div>
+    </button>
+    <!-- الزر الجديد الخاص بـ ADS -->
+    <button class="source-btn placeholder full-width" data-source="ads">
+      <div class="icon">✈️</div><div>مصدر Ads</div>
       <div class="status"><span class="dot"></span>غير مهيأ</div>
     </button>
   </div>
@@ -151,7 +161,7 @@
     <label>خط الطول (Longitude)</label>
     <input type="number" id="input-lng" step="0.0001" value="35.9486">
     <label>مدى الرادار (كم)</label>
-    <input type="number" id="input-radius" step="10" value="200">
+    <input type="number" id="input-radius" step="10" value="250">
     <div class="modal-buttons">
       <button class="btn-secondary" onclick="closeSettings()">إلغاء</button>
       <button class="btn-primary" onclick="saveSettings()">حفظ</button>
@@ -160,11 +170,12 @@
 </div>
 
 <script>
-const DEFAULT_CONFIG = { name: 'مطار اللاذقية الدولي', lat: 35.4011, lng: 35.9486, radius: 200 };
+const DEFAULT_CONFIG = { name: 'مطار اللاذقية الدولي', lat: 35.4011, lng: 35.9486, radius: 250 };
 let config = JSON.parse(localStorage.getItem('radar_config') || 'null') || {...DEFAULT_CONFIG};
 
 const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([config.lat, config.lng], 9);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 18, subdomains: 'abcd' }).addTo(map);
+// خريطة داكنة مضمونة وبدون API Key
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 }).addTo(map);
 
 let centerMarker = null, rangeCircle = null;
 function drawCenter() {
@@ -191,7 +202,7 @@ function drawCenter() {
 drawCenter();
 
 const aircraftMarkers = new Map();
-const activeSources = { opensky: true, atc: false, ploto: false, near: false };
+const activeSources = { opensky: true, atc: false, ploto: false, near: false, ads: false };
 
 function aircraftIcon(heading, onGround) {
   const color = onGround ? '#ffa726' : '#00e676';
@@ -210,54 +221,55 @@ function distanceKm(lat1, lon1, lat2, lon2) {
 }
 
 function popupContent(s) {
-  const [icao24, callsign, origin,,, lng, lat, baroAlt, onGround, velocity, heading,,, geoAlt, squawk] = s;
-  const dist = distanceKm(config.lat, config.lng, lat, lng);
-  const alt = Math.round(geoAlt || baroAlt || 0);
-  const speed = Math.round((velocity || 0) * 3.6);
+  const dist = distanceKm(config.lat, config.lng, s.lat, s.lon);
+  const isGround = s.alt_baro === 'ground';
+  const altFt = isGround ? 0 : (s.alt_baro || s.alt_geom || 0);
+  const altM = Math.round(altFt * 0.3048);
+  const speed = Math.round((s.gs || 0) * 1.852);
+  const callsign = (s.flight || '').trim() || s.hex.toUpperCase();
+  
   return `
-    <div class="popup-title">✈️ ${(callsign||'').trim() || icao24.toUpperCase()}</div>
-    <div class="popup-row"><span class="label">ICAO24</span><span class="value">${icao24.toUpperCase()}</span></div>
-    <div class="popup-row"><span class="label">بلد التسجيل</span><span class="value">${origin||'—'}</span></div>
-    <div class="popup-row"><span class="label">الارتفاع</span><span class="value">${alt} م</span></div>
+    <div class="popup-title">✈️ ${callsign}</div>
+    <div class="popup-row"><span class="label">ICAO24</span><span class="value">${s.hex.toUpperCase()}</span></div>
+    <div class="popup-row"><span class="label">الارتفاع</span><span class="value">${isGround ? 'على الأرض' : altM + ' م'}</span></div>
     <div class="popup-row"><span class="label">السرعة</span><span class="value">${speed} كم/س</span></div>
-    <div class="popup-row"><span class="label">الاتجاه</span><span class="value">${Math.round(heading||0)}°</span></div>
+    <div class="popup-row"><span class="label">الاتجاه</span><span class="value">${Math.round(s.track || 0)}°</span></div>
     <div class="popup-row"><span class="label">المسافة من المركز</span><span class="value">${dist.toFixed(1)} كم</span></div>
-    <div class="popup-row"><span class="label">الحالة</span><span class="value">${onGround?'🟠 على الأرض':'🟢 في الجو'}</span></div>
-    ${squawk ? `<div class="popup-row"><span class="label">Squawk</span><span class="value">${squawk}</span></div>` : ''}
+    ${s.squawk ? `<div class="popup-row"><span class="label">Squawk</span><span class="value">${s.squawk}</span></div>` : ''}
   `;
 }
 
-async function fetchOpenSky() {
+async function fetchData() {
   if (!activeSources.opensky) return;
   const dot = document.getElementById('status-dot'), txt = document.getElementById('status-text');
-  const degPerKm = 1/111, r = config.radius * degPerKm;
-  const lamin = (config.lat-r).toFixed(4), lamax = (config.lat+r).toFixed(4);
-  const lomin = (config.lng-r).toFixed(4), lomax = (config.lng+r).toFixed(4);
-  const url = `https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`;
+  
+  const nmRadius = Math.round(config.radius * 0.539957);
+  const url = `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${nmRadius}`;
+  
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     dot.classList.add('live'); txt.textContent = 'مباشر';
-    updateAircraft(data.states || []);
+    updateAircraft(data.ac || []);
   } catch (err) {
     console.error(err);
-    dot.classList.remove('live'); txt.textContent = 'خطأ/حد الطلبات';
+    dot.classList.remove('live'); txt.textContent = 'جاري المحاولة...';
   }
 }
 
 function updateAircraft(states) {
   const seen = new Set();
   for (const s of states) {
-    const [icao24,,, ,, lng, lat, , onGround, , heading] = s;
-    if (lat == null || lng == null) continue;
+    if (s.lat == null || s.lon == null) continue;
+    const icao24 = s.hex;
     seen.add(icao24);
-    const icon = aircraftIcon(heading || 0, onGround);
+    const icon = aircraftIcon(s.track || 0, s.alt_baro === 'ground');
     if (aircraftMarkers.has(icao24)) {
       const m = aircraftMarkers.get(icao24);
-      m.setLatLng([lat, lng]); m.setIcon(icon); m.setPopupContent(popupContent(s));
+      m.setLatLng([s.lat, s.lon]); m.setIcon(icon); m.setPopupContent(popupContent(s));
     } else {
-      const m = L.marker([lat, lng], { icon }).bindPopup(popupContent(s)).addTo(map);
+      const m = L.marker([s.lat, s.lon], { icon }).bindPopup(popupContent(s)).addTo(map);
       aircraftMarkers.set(icao24, m);
     }
   }
@@ -278,7 +290,7 @@ document.querySelectorAll('.source-btn').forEach(btn => {
     activeSources[src] = !activeSources[src];
     btn.classList.toggle('active', activeSources[src]);
     if (src === 'opensky') {
-      if (activeSources.opensky) fetchOpenSky();
+      if (activeSources.opensky) fetchData();
       else {
         for (const m of aircraftMarkers.values()) map.removeLayer(m);
         aircraftMarkers.clear();
@@ -306,13 +318,14 @@ function saveSettings() {
   closeSettings();
   map.setView([config.lat, config.lng], 9);
   drawCenter();
-  fetchOpenSky();
+  fetchData();
 }
 function toggleSources() { document.getElementById('sources').classList.toggle('collapsed'); }
 
 document.getElementById('settings-btn').addEventListener('click', openSettings);
-fetchOpenSky();
-setInterval(fetchOpenSky, 60000); // كل 60 ثانية (OpenSky مجاني بحدود معينة)
+
+fetchData();
+setInterval(fetchData, 10000); 
 </script>
 </body>
 </html>
