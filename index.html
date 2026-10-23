@@ -41,37 +41,20 @@
   #toggle-collapse { font-size: 18px; transition: transform 0.3s; }
   #sources.collapsed #toggle-collapse { transform: rotate(180deg); }
   
-  /* تحويل الأزرار إلى قائمة طولية */
-  #source-grid { 
-    display: flex; 
-    flex-direction: column; 
-    gap: 8px; 
-    margin-top: 8px; 
-    max-height: 40vh; /* عشان لو الشاشة صغيرة نقدر نسكرها */
-    overflow-y: auto;
-  }
+  #source-grid { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; max-height: 40vh; overflow-y: auto; }
   
   .source-btn {
     background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
     border-radius: 10px; padding: 12px 15px; color: #fff; font-size: 13px;
     display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 10px;
-    cursor: pointer; transition: all 0.2s; font-family: inherit;
-    width: 100%;
+    cursor: pointer; transition: all 0.2s; font-family: inherit; width: 100%;
   }
   
   .source-btn:active { transform: scale(0.97); }
   .source-btn .icon { font-size: 20px; }
   .source-btn .btn-text { flex: 1; text-align: right; font-weight: 500; }
-  
-  .source-btn .status { 
-    display: flex; justify-content: center; align-items: center; 
-    height: 10px; width: 20px;
-  }
-  .source-btn .dot { 
-    width: 8px; height: 8px; border-radius: 50%; 
-    background: #555; display: inline-block; 
-    transition: all 0.3s;
-  }
+  .source-btn .status { display: flex; justify-content: center; align-items: center; height: 10px; width: 20px; }
+  .source-btn .dot { width: 8px; height: 8px; border-radius: 50%; background: #555; display: inline-block; transition: all 0.3s; }
   
   .source-btn.active { background: rgba(0, 230, 118, 0.15); border-color: #00e676; }
   .source-btn.active .dot { background: #00e676; box-shadow: 0 0 8px #00e676; }
@@ -90,21 +73,12 @@
   #settings-modal.show { display: flex; }
   #settings-content {
     background: #1a2f4a; color: #fff; border-radius: 16px;
-    padding: 20px; width: 100%; max-width: 400px;
-    max-height: 90vh; overflow-y: auto;
+    padding: 20px; width: 100%; max-width: 400px; max-height: 90vh; overflow-y: auto;
   }
   #settings-content h2 { font-size: 16px; margin-bottom: 5px; text-align: center;}
   
-  /* تنسيق الاسم والتاريخ */
-  .dev-name {
-    text-align: center; font-size: 15px; font-weight: bold; 
-    color: #00e676; margin-bottom: 2px; 
-    font-family: monospace;
-  }
-  .dev-date {
-    text-align: center; font-size: 12px; color: #aaa; margin-bottom: 15px;
-    border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;
-  }
+  .dev-name { text-align: center; font-size: 15px; font-weight: bold; color: #00e676; margin-bottom: 2px; font-family: monospace; }
+  .dev-date { text-align: center; font-size: 12px; color: #aaa; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; }
   
   #settings-content label { font-size: 12px; display: block; margin-bottom: 4px; opacity: 0.8; margin-top: 10px;}
   #settings-content input {
@@ -113,35 +87,24 @@
     color: #fff; margin-bottom: 12px; font-size: 14px; font-family: inherit;
   }
   .modal-buttons { display: flex; gap: 8px; margin-top: 10px; }
-  .modal-buttons button {
-    flex: 1; padding: 12px; border-radius: 8px; border: none;
-    font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
-  }
+  .modal-buttons button { flex: 1; padding: 12px; border-radius: 8px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
   .btn-primary { background: #00e676; color: #0a1628; }
   .btn-secondary { background: rgba(255,255,255,0.1); color: #fff; }
   
-  .leaflet-popup-content-wrapper {
-    background: #0a1628; color: #fff; border-radius: 12px; font-family: inherit;
-  }
+  .leaflet-popup-content-wrapper { background: #0a1628; color: #fff; border-radius: 12px; font-family: inherit; }
   .leaflet-popup-tip { background: #0a1628; }
   .leaflet-popup-content { margin: 12px; }
-  .popup-title {
-    font-size: 15px; font-weight: 700; color: #00e676;
-    margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);
-  }
+  .popup-title { font-size: 15px; font-weight: 700; color: #00e676; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); }
   .popup-row { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; }
   .popup-row .label { opacity: 0.6; }
   .popup-row .value { font-weight: 500; }
   .leaflet-control-zoom { margin-top: 80px !important; }
   
-  /* تنسيق النص الخاص بالدوائر ليظهر على الحافة */
   .ring-label-marker {
     background: transparent; border: none; box-shadow: none;
     color: #82a5c1; font-size: 11px; font-family: monospace; font-weight: bold;
     text-shadow: 1px 1px 2px #000, -1px -1px 2px #000;
-    white-space: nowrap;
-    margin-left: 50%;
-    transform: translateX(-50%);
+    white-space: nowrap; margin-left: 50%; transform: translateX(-50%);
   }
 </style>
 </head>
@@ -156,7 +119,6 @@
   </div>
   <div style="display:flex; gap:6px; align-items:center;">
     <div id="status" style="margin-left: 5px;"><div id="status-dot"></div><span id="status-text">جاري الاتصال...</span></div>
-    
     <button class="top-btn" id="toggle-map-btn" title="تبديل نمط الخريطة">🌍</button>
     <button class="top-btn" id="toggle-rings-btn" title="إخفاء/إظهار الدوائر">🎯</button>
     <button class="top-btn" id="settings-btn">⚙️</button>
@@ -170,65 +132,38 @@
     <div id="toggle-collapse">▼</div>
   </div>
   <div id="source-grid">
-    
-    <!-- 1. محطة الرادار الدولية (الزر الأول) -->
     <button class="source-btn placeholder" data-source="atc">
-      <div class="icon">📡</div>
-      <div class="btn-text">محطة الرادار الدولية مطار اللاذقية</div>
-      <div class="status"><span class="dot"></span></div>
+      <div class="icon">📡</div><div class="btn-text">محطة الرادار الدولية مطار اللاذقية</div><div class="status"><span class="dot"></span></div>
     </button>
-    
-    <!-- 2. معلومات بلوتو -->
     <button class="source-btn placeholder" data-source="ploto">
-      <div class="icon">🛰️</div>
-      <div class="btn-text">معلومات بلوتو PA4</div>
-      <div class="status"><span class="dot"></span></div>
+      <div class="icon">🛰️</div><div class="btn-text">معلومات بلوتو PA4</div><div class="status"><span class="dot"></span></div>
     </button>
-    
-    <!-- 3. Near Radar -->
     <button class="source-btn placeholder" data-source="near">
-      <div class="icon">📶</div>
-      <div class="btn-text">Near Radar</div>
-      <div class="status"><span class="dot"></span></div>
+      <div class="icon">📶</div><div class="btn-text">Near Radar</div><div class="status"><span class="dot"></span></div>
     </button>
-    
-    <!-- 4. مصدر Ads -->
     <button class="source-btn placeholder" data-source="ads">
-      <div class="icon">✈️</div>
-      <div class="btn-text">مصدر Ads</div>
-      <div class="status"><span class="dot"></span></div>
+      <div class="icon">✈️</div><div class="btn-text">مصدر Ads</div><div class="status"><span class="dot"></span></div>
     </button>
-
-    <!-- 5. بيانات الشبكة (الإنترنت سابقاً - الزر الأخير) -->
     <button class="source-btn active" data-source="opensky">
-      <div class="icon">🌐</div>
-      <div class="btn-text">بيانات الشبكة</div>
-      <div class="status"><span class="dot"></span></div>
+      <div class="icon">🌐</div><div class="btn-text">بيانات الشبكة</div><div class="status"><span class="dot"></span></div>
     </button>
-
   </div>
 </div>
 
 <div id="settings-modal">
   <div id="settings-content">
     <h2>⚙️ إعدادات مركز السمت</h2>
-    
-    <!-- الاسم والتاريخ -->
     <div class="dev-name">Eng.Modar Hasan</div>
     <div class="dev-date">5/10/2023</div>
 
     <label>اسم الموقع</label>
     <input type="text" id="input-name" value="مطار اللاذقية الدولي">
-    
     <label>خط العرض (Latitude)</label>
     <input type="number" id="input-lat" step="0.0001" value="35.4011">
-    
     <label>خط الطول (Longitude)</label>
     <input type="number" id="input-lng" step="0.0001" value="35.9486">
-    
     <label>مدى الرادار الكلي (كم)</label>
     <input type="number" id="input-radius" step="10" value="250">
-    
     <label>المسافة بين الدوائر (كم)</label>
     <input type="number" id="input-ring-interval" step="10" value="50">
     
@@ -248,16 +183,10 @@ if (config.showRings === undefined) config.showRings = true;
 if (config.darkMap === undefined) config.darkMap = true;
 
 const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([config.lat, config.lng], 9);
-
 const darkMapLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 });
 const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 });
 
-if (config.darkMap) {
-  darkMapLayer.addTo(map);
-} else {
-  satelliteLayer.addTo(map);
-  document.getElementById('toggle-map-btn').style.opacity = '0.6';
-}
+if (config.darkMap) { darkMapLayer.addTo(map); } else { satelliteLayer.addTo(map); document.getElementById('toggle-map-btn').style.opacity = '0.6'; }
 
 let centerMarker = null, rangeCircle = null, rangeRings = [];
 
@@ -274,15 +203,8 @@ function drawCenter() {
     <line x1="0" y1="15" x2="8" y2="15" stroke="#00e676" stroke-width="1.5"/>
     <line x1="22" y1="15" x2="30" y2="15" stroke="#00e676" stroke-width="1.5"/>
   </svg>`;
-  centerMarker = L.marker([config.lat, config.lng], {
-    icon: L.divIcon({ html: svg, className: '', iconSize: [30,30], iconAnchor: [15,15] })
-  }).addTo(map);
-  
-  rangeCircle = L.circle([config.lat, config.lng], {
-    radius: config.radius * 1000, color: '#00e676', weight: 1, opacity: 0.3,
-    fillColor: '#00e676', fillOpacity: 0.03, dashArray: '5, 10'
-  }).addTo(map);
-  
+  centerMarker = L.marker([config.lat, config.lng], { icon: L.divIcon({ html: svg, className: '', iconSize: [30,30], iconAnchor: [15,15] }) }).addTo(map);
+  rangeCircle = L.circle([config.lat, config.lng], { radius: config.radius * 1000, color: '#00e676', weight: 1, opacity: 0.3, fillColor: '#00e676', fillOpacity: 0.03, dashArray: '5, 10' }).addTo(map);
   document.getElementById('center-label').textContent = config.name;
   drawRings();
 }
@@ -290,53 +212,25 @@ function drawCenter() {
 function drawRings() {
   rangeRings.forEach(r => map.removeLayer(r));
   rangeRings = [];
-
   if (!config.showRings || config.ringInterval <= 0) return;
 
   for (let d = config.ringInterval; d < config.radius; d += config.ringInterval) {
-    const circle = L.circle([config.lat, config.lng], {
-      radius: d * 1000,
-      color: '#4a7c9d', 
-      weight: 1,
-      opacity: 0.5,
-      fill: false,
-      dashArray: '3, 6'
-    }).addTo(map);
+    const circle = L.circle([config.lat, config.lng], { radius: d * 1000, color: '#4a7c9d', weight: 1, opacity: 0.5, fill: false, dashArray: '3, 6' }).addTo(map);
     rangeRings.push(circle);
-
     const labelLat = config.lat + (d / 111.32); 
-    const labelMarker = L.marker([labelLat, config.lng], {
-      icon: L.divIcon({ 
-        className: 'ring-label-marker', 
-        html: `<div>${d}</div>`,
-        iconSize: [20, 10],
-        iconAnchor: [10, 5]
-      }),
-      interactive: false
-    }).addTo(map);
+    const labelMarker = L.marker([labelLat, config.lng], { icon: L.divIcon({ className: 'ring-label-marker', html: `<div>${d}</div>`, iconSize: [20, 10], iconAnchor: [10, 5] }), interactive: false }).addTo(map);
     rangeRings.push(labelMarker);
   }
-  
   if (centerMarker) centerMarker.bringToFront();
 }
 
-if (!config.showRings) {
-  document.getElementById('toggle-rings-btn').style.opacity = '0.4';
-}
+if (!config.showRings) { document.getElementById('toggle-rings-btn').style.opacity = '0.4'; }
 
 document.getElementById('toggle-map-btn').addEventListener('click', () => {
   config.darkMap = !config.darkMap;
   localStorage.setItem('radar_config', JSON.stringify(config));
-  
-  if (config.darkMap) {
-    map.removeLayer(satelliteLayer);
-    map.addLayer(darkMapLayer);
-    document.getElementById('toggle-map-btn').style.opacity = '1';
-  } else {
-    map.removeLayer(darkMapLayer);
-    map.addLayer(satelliteLayer);
-    document.getElementById('toggle-map-btn').style.opacity = '0.6';
-  }
+  if (config.darkMap) { map.removeLayer(satelliteLayer); map.addLayer(darkMapLayer); document.getElementById('toggle-map-btn').style.opacity = '1'; } 
+  else { map.removeLayer(darkMapLayer); map.addLayer(satelliteLayer); document.getElementById('toggle-map-btn').style.opacity = '0.6'; }
   if (centerMarker) centerMarker.bringToFront();
 });
 
@@ -354,8 +248,7 @@ function aircraftIcon(heading, onGround) {
   const color = onGround ? '#ffa726' : '#00e676';
   return L.divIcon({
     html: `<svg width="30" height="30" viewBox="0 0 24 24" style="transform: rotate(${heading||0}deg); filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.6));">
-      <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" 
-            fill="${color}" stroke="#0a1628" stroke-width="1"/></svg>`,
+      <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" fill="${color}" stroke="#0a1628" stroke-width="1"/></svg>`,
     className: '', iconSize: [30,30], iconAnchor: [15,15]
   });
 }
@@ -391,17 +284,20 @@ async function fetchData() {
   
   const nmRadius = Math.round(config.radius * 0.539957);
   const apiUrl = `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${nmRadius}`;
-  
   const proxyUrl = `https://radarl.mmdr7104.workers.dev/?url=${encodeURIComponent(apiUrl)}`;
   
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000); 
+
   try {
-    const res = await fetch(proxyUrl);
+    const res = await fetch(proxyUrl, { signal: controller.signal });
+    clearTimeout(timeoutId);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
-    
     dot.classList.add('live'); txt.textContent = 'مباشر';
     updateAircraft(data.ac || []);
   } catch (err) {
+    clearTimeout(timeoutId);
     console.error(err);
     dot.classList.remove('live'); txt.textContent = 'خطأ في الاتصال';
   }
@@ -464,10 +360,8 @@ function saveSettings() {
   config.lat = parseFloat(document.getElementById('input-lat').value);
   config.lng = parseFloat(document.getElementById('input-lng').value);
   config.radius = parseFloat(document.getElementById('input-radius').value);
-  
   let newInterval = parseFloat(document.getElementById('input-ring-interval').value);
   config.ringInterval = (isNaN(newInterval) || newInterval <= 0) ? 50 : newInterval;
-
   localStorage.setItem('radar_config', JSON.stringify(config));
   closeSettings();
   map.setView([config.lat, config.lng], 9);
@@ -475,7 +369,6 @@ function saveSettings() {
   fetchData();
 }
 function toggleSources() { document.getElementById('sources').classList.toggle('collapsed'); }
-
 document.getElementById('settings-btn').addEventListener('click', openSettings);
 
 drawCenter();
