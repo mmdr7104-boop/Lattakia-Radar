@@ -165,7 +165,7 @@
   <div class="header-titles">
     <div class="title-right">
       <div class="main-title">مطار اللاذقية الدولي</div>
-      <div class="sub-title">نظام الرادار v2.7</div>
+      <div class="sub-title">نظام الرادار v2.8</div>
     </div>
     <div class="title-left">
       <div class="main-title">حركة الطيران المدني</div>
@@ -355,7 +355,7 @@ function clearCache() {
 }
 
 const aircraftMarkers = new Map();
-const aircraftStates = new Map(); // لتخزين حالة الطائرة للحركة المستمرة
+const aircraftStates = new Map();
 let selectedAircraftId = null;
 let lastAnimationTime = performance.now();
 let lastPopupUpdate = 0;
@@ -394,7 +394,7 @@ function popupContent(s) {
   `;
 }
 
-// جلب البيانات من OpenSky
+// التعديل هنا: تمرير الرابط عبر الوسيط
 async function fetchData() {
   const dot = document.getElementById('status-dot'), txt = document.getElementById('status-text');
   txt.textContent = 'جاري التحديث...';
@@ -406,9 +406,10 @@ async function fetchData() {
   const lomax = (config.lng + 1.5).toFixed(2);
 
   const apiUrl = `https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`;
+  const proxyUrl = `https://radarl.mmdr7104.workers.dev/?url=${encodeURIComponent(apiUrl)}&cb=${Date.now()}`;
 
   try {
-    const res = await fetch(apiUrl);
+    const res = await fetch(proxyUrl, { cache: 'no-store' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     
@@ -418,10 +419,10 @@ async function fetchData() {
       lon: s[5],
       lat: s[6],
       alt_baro: s[7] ? s[7] * 3.28084 : (s[13] ? s[13] * 3.28084 : 0),
-      gs: s[9] ? s[9] * 1.94384 : 0, // knots
+      gs: s[9] ? s[9] * 1.94384 : 0,
       track: s[10] || 0,
       squawk: s[14],
-      velocity_ms: s[9] || 0 // متر/ثانية للحركة
+      velocity_ms: s[9] || 0
     }));
 
     dot.classList.add('live'); 
@@ -433,12 +434,11 @@ async function fetchData() {
   } catch (err) {
     console.warn('فشل الاتصال:', err.message);
     dot.classList.remove('live'); 
-    txt.textContent = 'فشل الاتصال (حظر مؤقت)';
+    txt.textContent = 'حظر مؤقت، انتظر قليلاً...';
     txt.style.color = '#ff4444';
   }
 }
 
-// تحديث البيانات وتخزين حالة الطائرة للحركة المستمرة
 function updateAircraftData(states) {
   const seen = new Set();
   
@@ -447,7 +447,6 @@ function updateAircraftData(states) {
     const icao24 = s.hex;
     seen.add(icao24);
     
-    // تحديث حالة الطائرة (نقطة البداية للحركة)
     aircraftStates.set(icao24, {
       lat: s.lat,
       lon: s.lon,
@@ -461,10 +460,7 @@ function updateAircraftData(states) {
       const icon = aircraftIcon(s.track, s.alt_baro === 'ground');
       const m = L.marker([s.lat, s.lon], { icon }).bindPopup(popupContent(s)).addTo(map);
       
-      m.on('click', () => { 
-          selectedAircraftId = icao24; 
-      });
-      
+      m.on('click', () => { selectedAircraftId = icao24; });
       m.on('popupclose', () => {
           selectedAircraftId = null;
           document.getElementById('debug-panel').style.display = 'none';
@@ -478,17 +474,13 @@ function updateAircraftData(states) {
     }
   }
   
-  // حذف الطائرات التي اختفت
   for (const [k, m] of aircraftMarkers.entries()) {
     if (!seen.has(k)) { 
-      map.removeLayer(m); 
-      aircraftMarkers.delete(k); 
-      aircraftStates.delete(k);
+      map.removeLayer(m); aircraftMarkers.delete(k); aircraftStates.delete(k);
     }
   }
 }
 
-// محرك الحركة المستمرة (السر في العرض الاحترافي)
 function continuousAnimation(currentTime) {
     const dt = (currentTime - lastAnimationTime) / 1000;
     lastAnimationTime = currentTime;
@@ -497,12 +489,10 @@ function continuousAnimation(currentTime) {
         const marker = aircraftMarkers.get(icao24);
         if (!marker || state.onGround || state.velocity === 0) return;
 
-        // حساب المسافة المقطوعة في هذه الأجزاء من الثانية
         const distance = state.velocity * dt; 
         const trackRad = state.track * Math.PI / 180;
         const latRad = state.lat * Math.PI / 180;
 
-        // تحويل الأمتار إلى إحداثيات
         const dLat = (distance * Math.cos(trackRad)) / 111320;
         const dLon = (distance * Math.sin(trackRad)) / (111320 * Math.cos(latRad));
 
@@ -511,7 +501,6 @@ function continuousAnimation(currentTime) {
 
         marker.setLatLng([state.lat, state.lon]);
         
-        // تحديث شاشة التشخيص والنافذة كل 500 ملي ثانية
         if (currentTime - lastPopupUpdate > 500) {
             if (selectedAircraftId === icao24) {
                 const pingTime = new Date().toLocaleTimeString('en-GB'); 
@@ -527,10 +516,7 @@ function continuousAnimation(currentTime) {
         }
     });
 
-    if (currentTime - lastPopupUpdate > 500) {
-        lastPopupUpdate = currentTime;
-    }
-
+    if (currentTime - lastPopupUpdate > 500) { lastPopupUpdate = currentTime; }
     requestAnimationFrame(continuousAnimation);
 }
 
@@ -575,8 +561,8 @@ document.getElementById('settings-btn').addEventListener('click', openSettings);
 
 drawCenter();
 fetchData();
-setInterval(fetchData, 10000); // تحديث البيانات الحقيقية كل 10 ثواني
-requestAnimationFrame(continuousAnimation); // تشغيل محرك الحركة المستمرة
+setInterval(fetchData, 10000);
+requestAnimationFrame(continuousAnimation);
 </script>
 </body>
 </html>
