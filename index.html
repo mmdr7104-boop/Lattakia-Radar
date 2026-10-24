@@ -366,7 +366,7 @@ function popupContent(s) {
   `;
 }
 
-// ** التبديل التلقائي بين المصادر مع منع الكاش تماماً **
+// ** التبديل التلقائي بين المصادر **
 async function fetchData() {
   if (!activeSources.opensky) return;
   const dot = document.getElementById('status-dot'), txt = document.getElementById('status-text');
@@ -376,10 +376,11 @@ async function fetchData() {
 
   const nmRadius = Math.round(config.radius * 0.539957);
   
+  // إضافة باراميتر عشوائي للتأكد من جلب بيانات جديدة 100%
   const sources = [
-    { name: 'adsb.lol', url: `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${nmRadius}` },
-    { name: 'adsb.fi', url: `https://opendata.adsb.fi/api/v2/point/${config.lat}/${config.lng}/${nmRadius}` },
-    { name: 'airplanes.live', url: `https://api.airplanes.live/v2/point/${config.lat}/${config.lng}/${nmRadius}` }
+    { name: 'adsb.lol', url: `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${nmRadius}?t=${Date.now()}` },
+    { name: 'adsb.fi', url: `https://opendata.adsb.fi/api/v2/point/${config.lat}/${config.lng}/${nmRadius}?t=${Date.now()}` },
+    { name: 'airplanes.live', url: `https://api.airplanes.live/v2/point/${config.lat}/${config.lng}/${nmRadius}?t=${Date.now()}` }
   ];
 
   let success = false;
@@ -387,7 +388,7 @@ async function fetchData() {
 
   for (let i = 0; i < sources.length; i++) {
     try {
-      const proxyUrl = `https://radarl.mmdr7104.workers.dev/?url=${encodeURIComponent(sources[i].url)}&cb=${Date.now()}`;
+      const proxyUrl = `https://radarl.mmdr7104.workers.dev/?url=${encodeURIComponent(sources[i].url)}`;
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000); 
@@ -427,7 +428,7 @@ function animateMarker(marker, targetLat, targetLng, duration) {
 
   function step(currentTime) {
     const elapsed = currentTime - startTime;
-    const progress = Math.min(elapsed / duration, 1); // من 0 إلى 1
+    const progress = Math.min(elapsed / duration, 1); 
 
     const currentLat = startLat + (targetLat - startLat) * progress;
     const currentLng = startLng + (targetLng - startLng) * progress;
@@ -468,14 +469,13 @@ function updateAircraft(states) {
       }
     }
 
-    // --- التحرك الانسيابي ---
+    // --- التحرك الانسيابي (4.5 ثانية لتغطية وقت التحديث 5 ثواني) ---
     if (aircraftMarkers.has(icao24)) {
       const m = aircraftMarkers.get(icao24);
       m.setIcon(icon); 
       m.setPopupContent(popupContent(s));
       
-      // تحريك الطائرة بسلاسة خلال 10 ثواني (لتغطية وقت التحديث)
-      animateMarker(m, s.lat, s.lon, 10000);
+      animateMarker(m, s.lat, s.lon, 4500);
       
     } else {
       const m = L.marker([s.lat, s.lon], { icon }).bindPopup(popupContent(s)).addTo(map);
@@ -548,7 +548,8 @@ document.getElementById('settings-btn').addEventListener('click', openSettings);
 
 drawCenter();
 fetchData();
-setInterval(fetchData, 15000); 
+// تسريع التحديث ليكون كل 5 ثواني عشان الحركة تكون سلسة جداً
+setInterval(fetchData, 5000); 
 </script>
 </body>
 </html>
