@@ -32,8 +32,9 @@
   #status-dot.live { background: #00e676; animation: pulse 2s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
   
-  /* شاشة التشخيص */
+  /* الشاشة السوداء (مخفية افتراضياً) */
   #debug-panel {
+    display: none;
     position: absolute; top: 110px; left: 10px; z-index: 1000;
     background: rgba(0,0,0,0.85); color: #00e676; padding: 10px;
     font-family: monospace; font-size: 12px; border-radius: 5px;
@@ -136,11 +137,12 @@
 
 <div id="map"></div>
 
-<div id="debug-panel">Click on a plane to track...</div>
+<!-- الشاشة السوداء (مخفية افتراضياً) -->
+<div id="debug-panel"></div>
 
 <div id="topbar">
   <div>
-    <h1>🛩️ مراقبة الحركة الجوية <span style="color:#00e676; font-size:10px;">v2.1</span></h1>
+    <h1>🛩️ مراقبة الحركة الجوية <span style="color:#00e676; font-size:10px;">v2.2</span></h1>
     <div class="subtitle" id="center-label">مطار اللاذقية الدولي</div>
   </div>
   <div style="display:flex; gap:5px; align-items:center;">
@@ -328,8 +330,6 @@ function clearCache() {
 const aircraftMarkers = new Map();
 const aircraftTrails = new Map();
 const activeSources = { opensky: true, atc: false, ploto: false, near: false, ads: false };
-
-// متغير لتخزين الطائرة التي تم الضغط عليها
 let selectedAircraftId = null;
 
 function aircraftIcon(heading, onGround) {
@@ -441,21 +441,19 @@ function animateMarker(marker, targetLat, targetLng, duration) {
 
 function updateAircraft(states) {
   const seen = new Set();
-  let debugText = selectedAircraftId ? "Tracking lost..." : "Click on a plane to track...";
+  let debugText = "";
   
   for (const s of states) {
     if (s.lat == null || s.lon == null) continue;
     const icao24 = s.hex;
     seen.add(icao24);
     
-    // إذا كانت هذه الطائرة هي المحددة، حدث شاشة التشخيص
+    // تحديث شاشة التشخيص فقط إذا كانت هذه هي الطائرة المحددة
     if (selectedAircraftId === icao24) {
-        debugText = `TRACKING: ${s.flight ? s.flight.trim() : icao24}\nLat: ${s.lat.toFixed(5)}\nLon: ${s.lon.toFixed(5)}\nSpd: ${Math.round((s.gs||0)*1.852)} km/h\nAlt: ${Math.round((s.alt_baro||0)*0.3048)} m`;
+        debugText = `TRACKING: ${s.flight ? s.flight.trim() : icao24}\nLat: ${s.lat.toFixed(5)}\nLon: ${s.lon.toFixed(5)}\nSpd: ${Math.round((s.gs||0)*1.852)} km/h\nSeen: ${s.seen}s`;
     }
 
-    if (aircraftTrails.has(icao24)) {
-       // Keep trail
-    } else {
+    if (!aircraftTrails.has(icao24)) {
        aircraftTrails.set(icao24, { points: [], line: null });
     }
     
@@ -482,18 +480,29 @@ function updateAircraft(states) {
       animateMarker(m, s.lat, s.lon, 4500);
     } else {
       const m = L.marker([s.lat, s.lon], { icon }).bindPopup(popupContent(s)).addTo(map);
-      // عند الضغط على الطائرة، نقوم بتخزين رقمها في المتغير
-      m.on('click', () => { selectedAircraftId = icao24; });
+      
+      // عند الضغط: إظهار الشاشة السوداء وتحديثها فوراً
+      m.on('click', () => { 
+          selectedAircraftId = icao24; 
+          const debugPanel = document.getElementById('debug-panel');
+          debugPanel.style.display = 'block';
+          debugPanel.innerText = `TRACKING: ${s.flight ? s.flight.trim() : icao24}\nLat: ${s.lat.toFixed(5)}\nLon: ${s.lon.toFixed(5)}\nSpd: ${Math.round((s.gs||0)*1.852)} km/h\nSeen: ${s.seen}s`;
+      });
+
+      // عند إغلاق النافذة: إخفاء الشاشة السوداء
+      m.on('popupclose', () => {
+          selectedAircraftId = null;
+          document.getElementById('debug-panel').style.display = 'none';
+      });
+
       aircraftMarkers.set(icao24, m);
     }
   }
   
-  // إذا اختفت الطائرة المحددة
-  if (selectedAircraftId && !seen.has(selectedAircraftId)) {
-      selectedAircraftId = null;
+  // تحديث مستمر للشاشة السوداء طالما في طائرة محددة
+  if (selectedAircraftId && seen.has(selectedAircraftId)) {
+      document.getElementById('debug-panel').innerText = debugText;
   }
-
-  document.getElementById('debug-panel').innerText = debugText;
   
   for (const [k, m] of aircraftMarkers.entries()) {
     if (!seen.has(k)) { 
