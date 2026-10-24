@@ -165,7 +165,7 @@
   <div class="header-titles">
     <div class="title-right">
       <div class="main-title">مطار اللاذقية الدولي</div>
-      <div class="sub-title">نظام الرادار v3.4</div>
+      <div class="sub-title">نظام الرادار v3.5</div>
     </div>
     <div class="title-left">
       <div class="main-title">حركة الطيران المدني</div>
@@ -175,7 +175,6 @@
   
   <div class="header-controls">
     <div id="status"><div id="status-dot"></div><span id="status-text">جاري...</span></div>
-    <!-- تم حذف زر المحاكاة -->
     <button class="top-btn" id="refresh-btn" title="تحديث البيانات">🔄</button>
     <button class="top-btn" id="toggle-map-btn" title="تبديل الخريطة">🌍</button>
     <button class="top-btn" id="toggle-rings-btn" title="الدوائر">🎯</button>
@@ -346,7 +345,7 @@ document.getElementById('toggle-rings-btn').addEventListener('click', () => {
 });
 
 // ==========================================
-// ** نظام OAuth2 للتوكن (مع التشخيص) **
+// ** نظام OAuth2 عبر الوسيط (لحل مشكلة CORS) **
 // ==========================================
 let openskyAccessToken = null;
 let tokenExpiryTime = 0;
@@ -354,7 +353,10 @@ let tokenExpiryTime = 0;
 async function getOpenSkyToken() {
     if (openskyAccessToken && Date.now() < tokenExpiryTime) return openskyAccessToken;
 
-    const tokenUrl = 'https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token';
+    // نمرر رابط تسجيل الدخول عبر الوسيط الخاص بك
+    const originalTokenUrl = 'https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token';
+    const tokenUrl = `https://radarl.mmdr7104.workers.dev/?url=${encodeURIComponent(originalTokenUrl)}`;
+
     const params = new URLSearchParams();
     params.append('grant_type', 'client_credentials');
     params.append('client_id', OPENSKY_CLIENT_ID);
@@ -378,8 +380,6 @@ async function getOpenSkyToken() {
         
         return openskyAccessToken;
     } catch (error) {
-        // عرض رسالة الخطأ للمطور (أنت) عشان تعرف السبب
-        alert("فشل تسجيل الدخول لـ OpenSky:\n" + error.message + "\n\nملاحظة: قد يكون السبب هو حظر الـ CORS من المتصفح. جرب متصفح آخر أو تأكد من صحة المفاتيح.");
         console.error('خطأ OAuth2:', error);
         return null;
     }
@@ -652,4 +652,4 @@ smartFetch();
 requestAnimationFrame(continuousAnimation);
 </script>
 </body>
-  </html>
+</html>
