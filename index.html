@@ -17,17 +17,41 @@
   html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
   #map { position: absolute; inset: 0; background: #0a1628; }
   
+  /* الشريط العلوي الجديد */
   #topbar {
     position: absolute; top: 0; left: 0; right: 0; z-index: 1000;
-    background: linear-gradient(135deg, #0a1628 0%, #1a2f4a 100%);
-    color: #fff; padding: 8px 10px;
-    display: flex; justify-content: space-between; align-items: center;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-    flex-wrap: wrap; gap: 5px;
+    background: linear-gradient(180deg, #0a1628 0%, #12253f 100%);
+    color: #fff; padding: 8px 15px;
+    display: flex; flex-direction: column; gap: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    border-bottom: 2px solid #00e676;
   }
-  #topbar h1 { font-size: 13px; font-weight: 600; }
-  #topbar .subtitle { font-size: 10px; opacity: 0.7; }
-  #status { display: flex; align-items: center; gap: 4px; font-size: 10px; }
+  
+  .header-titles {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    width: 100%;
+  }
+  
+  .title-right { text-align: right; }
+  .title-left { text-align: left; }
+  
+  .main-title {
+    font-size: 16px; font-weight: 800; color: #fff; letter-spacing: 0.5px;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+  }
+  
+  .sub-title {
+    font-size: 11px; color: #00e676; font-family: monospace; font-weight: bold; margin-top: 2px;
+    letter-spacing: 1px;
+  }
+
+  .header-controls {
+    display: flex; justify-content: center; align-items: center; gap: 6px;
+    background: rgba(0,0,0,0.3); padding: 5px 10px; border-radius: 8px;
+    border: 1px solid rgba(0,230,118,0.2);
+  }
+
+  #status { display: flex; align-items: center; gap: 4px; font-size: 10px; margin-right: 10px;}
   #status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff4444; }
   #status-dot.live { background: #00e676; animation: pulse 2s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
@@ -118,7 +142,7 @@
   .popup-row { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; }
   .popup-row .label { opacity: 0.6; }
   .popup-row .value { font-weight: 500; }
-  .leaflet-control-zoom { margin-top: 80px !important; }
+  .leaflet-control-zoom { margin-top: 120px !important; }
   
   .ring-label-marker {
     background: transparent; border: none; box-shadow: none;
@@ -140,12 +164,19 @@
 <div id="debug-panel"></div>
 
 <div id="topbar">
-  <div>
-    <h1>🛩️ مراقبة الحركة الجوية <span style="color:#00e676; font-size:10px;">v2.3</span></h1>
-    <div class="subtitle" id="center-label">مطار اللاذقية الدولي</div>
+  <div class="header-titles">
+    <div class="title-right">
+      <div class="main-title">مطار اللاذقية الدولي</div>
+      <div class="sub-title">نظام الرادار v2.4</div>
+    </div>
+    <div class="title-left">
+      <div class="main-title">حركة الطيران المدني</div>
+      <div class="sub-title">العام 2023</div>
+    </div>
   </div>
-  <div style="display:flex; gap:5px; align-items:center;">
-    <div id="status" style="margin-left: 2px; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><div id="status-dot"></div><span id="status-text">جاري...</span></div>
+  
+  <div class="header-controls">
+    <div id="status"><div id="status-dot"></div><span id="status-text">جاري...</span></div>
     <button class="top-btn" id="refresh-btn" title="تحديث البيانات">🔄</button>
     <button class="top-btn" id="toggle-map-btn" title="تبديل الخريطة">🌍</button>
     <button class="top-btn" id="toggle-rings-btn" title="الدوائر">🎯</button>
@@ -275,7 +306,6 @@ function drawCenter() {
   </svg>`;
   centerMarker = L.marker([config.lat, config.lng], { icon: L.divIcon({ html: svg, className: '', iconSize: [30,30], iconAnchor: [15,15] }) }).addTo(map);
   rangeCircle = L.circle([config.lat, config.lng], { radius: config.radius * 1000, color: '#00e676', weight: 1, opacity: 0.3, fillColor: '#00e676', fillOpacity: 0.03, dashArray: '5, 10' }).addTo(map);
-  document.getElementById('center-label').textContent = config.name;
   drawRings();
   drawAirways();
 }
@@ -374,11 +404,12 @@ async function fetchData() {
 
   const nmRadius = Math.round(config.radius * 0.539957);
   
-  // إضافة كاسر كاش داخل رابط السيرفر نفسه
+  // كاسر الكاش العشوائي
+  const randomHash = Math.random().toString(36).substring(7);
   const sources = [
-    { name: 'adsb.fi', url: `https://opendata.adsb.fi/api/v2/point/${config.lat}/${config.lng}/${nmRadius}?t=${Date.now()}` },
-    { name: 'adsb.lol', url: `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${nmRadius}?t=${Date.now()}` },
-    { name: 'airplanes.live', url: `https://api.airplanes.live/v2/point/${config.lat}/${config.lng}/${nmRadius}?t=${Date.now()}` }
+    { name: 'adsb.fi', url: `https://opendata.adsb.fi/api/v2/point/${config.lat}/${config.lng}/${nmRadius}?cb=${randomHash}` },
+    { name: 'adsb.lol', url: `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${nmRadius}?cb=${randomHash}` },
+    { name: 'airplanes.live', url: `https://api.airplanes.live/v2/point/${config.lat}/${config.lng}/${nmRadius}?cb=${randomHash}` }
   ];
 
   let success = false;
@@ -449,7 +480,6 @@ function updateAircraft(states) {
     seen.add(icao24);
     
     if (selectedAircraftId === icao24) {
-        // Ping يثبت أن الطلب تم إرساله للتو
         const pingTime = new Date().toLocaleTimeString('en-GB'); 
         debugText = `TRACKING: ${s.flight ? s.flight.trim() : icao24}\nPing: ${pingTime}\nLat: ${s.lat.toFixed(5)}\nLon: ${s.lon.toFixed(5)}\nSpd: ${Math.round((s.gs||0)*1.852)} km/h`;
     }
