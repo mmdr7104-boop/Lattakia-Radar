@@ -32,6 +32,15 @@
   #status-dot.live { background: #00e676; animation: pulse 2s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
   
+  /* شاشة التشخيص */
+  #debug-panel {
+    position: absolute; top: 110px; left: 10px; z-index: 1000;
+    background: rgba(0,0,0,0.85); color: #00e676; padding: 10px;
+    font-family: monospace; font-size: 12px; border-radius: 5px;
+    border: 1px solid #00e676; direction: ltr; pointer-events: none;
+    box-shadow: 0 0 10px rgba(0,230,118,0.3); line-height: 1.4;
+  }
+  
   #sources {
     position: absolute; bottom: 0; left: 0; right: 0; z-index: 1000;
     background: linear-gradient(135deg, #0a1628 0%, #1a2f4a 100%);
@@ -127,9 +136,11 @@
 
 <div id="map"></div>
 
+<div id="debug-panel">Click on a plane to track...</div>
+
 <div id="topbar">
   <div>
-    <h1>🛩️ مراقبة الحركة الجوية</h1>
+    <h1>🛩️ مراقبة الحركة الجوية <span style="color:#00e676; font-size:10px;">v2.1</span></h1>
     <div class="subtitle" id="center-label">مطار اللاذقية الدولي</div>
   </div>
   <div style="display:flex; gap:5px; align-items:center;">
@@ -159,7 +170,7 @@
       <div class="icon">📶</div><div class="btn-text">Near Radar</div><div class="status"><span class="dot"></span></div>
     </button>
     <button class="source-btn placeholder" data-source="ads">
-      <div class="icon">✈️</div><div class="btn-text">مصدر Ads</div><div class="status"><span class="dot"></span></div>
+      <div class="icon">✈️</div><div class="btn-text">مصدر ADS-B</div><div class="status"><span class="dot"></span></div>
     </button>
     <button class="source-btn active" data-source="opensky">
       <div class="icon">🌐</div><div class="btn-text">بيانات الشبكة</div><div class="status"><span class="dot"></span></div>
@@ -192,7 +203,6 @@
   </div>
 </div>
 
-<!-- شريط حقوق النشر في أسفل الشاشة -->
 <div style="position: absolute; bottom: 50px; width: 100%; text-align: center; color: rgba(255,255,255,0.3); font-size: 10px; z-index: 1000; pointer-events: none; font-family: monospace;">
   © 2023 Eng. Modar Hasan - All Rights Reserved
 </div>
@@ -212,17 +222,12 @@ const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/
 
 if (config.darkMap) { darkMapLayer.addTo(map); } else { satelliteLayer.addTo(map); document.getElementById('toggle-map-btn').style.opacity = '0.6'; }
 
-// ==========================================
-// رسم الممرات الجوية (Airways)
-// ==========================================
 const airwaysLayer = L.layerGroup().addTo(map);
-
 const airwaysData = [
   { name: "UL620", coords: [[36.2, 35.5], [35.4, 35.9], [34.5, 36.0], [33.5, 35.8]], color: "#ff9800" },
   { name: "UR219", coords: [[37.0, 36.5], [36.0, 36.3], [35.4, 35.9], [34.0, 36.5], [32.0, 36.5]], color: "#29b6f6" },
   { name: "UP60", coords: [[36.5, 32.0], [36.0, 34.0], [35.4, 35.9], [35.2, 36.5], [35.0, 38.0]], color: "#ab47bc" }
 ];
-
 const waypoints = [
   { name: "LATAKIA", lat: 35.4011, lng: 35.9486 },
   { name: "BEIRUT", lat: 33.8208, lng: 35.4883 },
@@ -233,13 +238,11 @@ const waypoints = [
 function drawAirways() {
   airwaysLayer.clearLayers();
   if (!config.showAirways) return;
-
   airwaysData.forEach(airway => {
     L.polyline(airway.coords, { color: airway.color, weight: 2, opacity: 0.6, dashArray: '8, 8' }).addTo(airwaysLayer);
     const midPoint = airway.coords[Math.floor(airway.coords.length / 2)];
     L.marker(midPoint, { icon: L.divIcon({ className: 'waypoint-label', html: airway.name, iconSize: [50, 20], iconAnchor: [25, 10] }), interactive: false }).addTo(airwaysLayer);
   });
-
   waypoints.forEach(wp => {
     L.circleMarker([wp.lat, wp.lng], { radius: 4, color: '#ffca28', weight: 2, fillColor: '#000', fillOpacity: 1 }).addTo(airwaysLayer);
     L.marker([wp.lat, wp.lng], { icon: L.divIcon({ className: 'waypoint-label', html: wp.name, iconSize: [80, 20], iconAnchor: [40, -5] }), interactive: false }).addTo(airwaysLayer);
@@ -254,9 +257,6 @@ document.getElementById('toggle-airways-btn').addEventListener('click', () => {
 });
 if (!config.showAirways) { document.getElementById('toggle-airways-btn').style.opacity = '0.4'; }
 
-// ==========================================
-// الدوائر والمركز
-// ==========================================
 let centerMarker = null, rangeCircle = null, rangeRings = [];
 
 function drawCenter() {
@@ -325,12 +325,12 @@ function clearCache() {
   window.location.replace(window.location.pathname + '?v=' + Date.now());
 }
 
-// ==========================================
-// إدارة الطائرات والمسارات (Trails)
-// ==========================================
 const aircraftMarkers = new Map();
 const aircraftTrails = new Map();
 const activeSources = { opensky: true, atc: false, ploto: false, near: false, ads: false };
+
+// متغير لتخزين الطائرة التي تم الضغط عليها
+let selectedAircraftId = null;
 
 function aircraftIcon(heading, onGround) {
   const color = onGround ? '#ffa726' : '#00e676';
@@ -366,7 +366,6 @@ function popupContent(s) {
   `;
 }
 
-// ** التبديل التلقائي بين المصادر **
 async function fetchData() {
   if (!activeSources.opensky) return;
   const dot = document.getElementById('status-dot'), txt = document.getElementById('status-text');
@@ -376,11 +375,10 @@ async function fetchData() {
 
   const nmRadius = Math.round(config.radius * 0.539957);
   
-  // إضافة باراميتر عشوائي للتأكد من جلب بيانات جديدة 100%
   const sources = [
-    { name: 'adsb.lol', url: `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${nmRadius}?t=${Date.now()}` },
-    { name: 'adsb.fi', url: `https://opendata.adsb.fi/api/v2/point/${config.lat}/${config.lng}/${nmRadius}?t=${Date.now()}` },
-    { name: 'airplanes.live', url: `https://api.airplanes.live/v2/point/${config.lat}/${config.lng}/${nmRadius}?t=${Date.now()}` }
+    { name: 'adsb.fi', url: `https://opendata.adsb.fi/api/v2/point/${config.lat}/${config.lng}/${nmRadius}` },
+    { name: 'adsb.lol', url: `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${nmRadius}` },
+    { name: 'airplanes.live', url: `https://api.airplanes.live/v2/point/${config.lat}/${config.lng}/${nmRadius}` }
   ];
 
   let success = false;
@@ -388,7 +386,7 @@ async function fetchData() {
 
   for (let i = 0; i < sources.length; i++) {
     try {
-      const proxyUrl = `https://radarl.mmdr7104.workers.dev/?url=${encodeURIComponent(sources[i].url)}`;
+      const proxyUrl = `https://radarl.mmdr7104.workers.dev/?url=${encodeURIComponent(sources[i].url)}&cb=${Date.now()}`;
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000); 
@@ -420,7 +418,6 @@ async function fetchData() {
   }
 }
 
-// ** دالة الحركة الانسيابية **
 function animateMarker(marker, targetLat, targetLng, duration) {
   const startLat = marker.getLatLng().lat;
   const startLng = marker.getLatLng().lng;
@@ -444,44 +441,59 @@ function animateMarker(marker, targetLat, targetLng, duration) {
 
 function updateAircraft(states) {
   const seen = new Set();
+  let debugText = selectedAircraftId ? "Tracking lost..." : "Click on a plane to track...";
+  
   for (const s of states) {
     if (s.lat == null || s.lon == null) continue;
     const icao24 = s.hex;
     seen.add(icao24);
-    const icon = aircraftIcon(s.track || 0, s.alt_baro === 'ground');
     
-    // --- كود المسار (Trail) ---
-    if (!aircraftTrails.has(icao24)) {
-      aircraftTrails.set(icao24, { points: [], line: null });
+    // إذا كانت هذه الطائرة هي المحددة، حدث شاشة التشخيص
+    if (selectedAircraftId === icao24) {
+        debugText = `TRACKING: ${s.flight ? s.flight.trim() : icao24}\nLat: ${s.lat.toFixed(5)}\nLon: ${s.lon.toFixed(5)}\nSpd: ${Math.round((s.gs||0)*1.852)} km/h\nAlt: ${Math.round((s.alt_baro||0)*0.3048)} m`;
     }
-    const trailData = aircraftTrails.get(icao24);
+
+    if (aircraftTrails.has(icao24)) {
+       // Keep trail
+    } else {
+       aircraftTrails.set(icao24, { points: [], line: null });
+    }
     
+    const trailData = aircraftTrails.get(icao24);
     const lastPoint = trailData.points[trailData.points.length - 1];
+    
     if (!lastPoint || (lastPoint[0] !== s.lat || lastPoint[1] !== s.lon)) {
       trailData.points.push([s.lat, s.lon]);
-      
       if (trailData.points.length > 30) { trailData.points.shift(); }
 
       if (trailData.line) {
         trailData.line.setLatLngs(trailData.points);
       } else {
-        trailData.line = L.polyline(trailData.points, { color: '#00e676', weight: 2, opacity: 0.4, dashArray: '5, 5' }).addTo(map);
+        trailData.line = L.polyline(trailData.points, { color: '#00e676', weight: 3, opacity: 0.6, dashArray: '2, 4' }).addTo(map);
       }
     }
 
-    // --- التحرك الانسيابي (4.5 ثانية لتغطية وقت التحديث 5 ثواني) ---
+    const icon = aircraftIcon(s.track || 0, s.alt_baro === 'ground');
+
     if (aircraftMarkers.has(icao24)) {
       const m = aircraftMarkers.get(icao24);
       m.setIcon(icon); 
       m.setPopupContent(popupContent(s));
-      
       animateMarker(m, s.lat, s.lon, 4500);
-      
     } else {
       const m = L.marker([s.lat, s.lon], { icon }).bindPopup(popupContent(s)).addTo(map);
+      // عند الضغط على الطائرة، نقوم بتخزين رقمها في المتغير
+      m.on('click', () => { selectedAircraftId = icao24; });
       aircraftMarkers.set(icao24, m);
     }
   }
+  
+  // إذا اختفت الطائرة المحددة
+  if (selectedAircraftId && !seen.has(selectedAircraftId)) {
+      selectedAircraftId = null;
+  }
+
+  document.getElementById('debug-panel').innerText = debugText;
   
   for (const [k, m] of aircraftMarkers.entries()) {
     if (!seen.has(k)) { 
@@ -548,7 +560,6 @@ document.getElementById('settings-btn').addEventListener('click', openSettings);
 
 drawCenter();
 fetchData();
-// تسريع التحديث ليكون كل 5 ثواني عشان الحركة تكون سلسة جداً
 setInterval(fetchData, 5000); 
 </script>
 </body>
