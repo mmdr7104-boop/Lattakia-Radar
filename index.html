@@ -50,7 +50,7 @@
     border: 1px solid rgba(0,230,118,0.2);
   }
 
-  #status { display: flex; align-items: center; gap: 4px; font-size: 10px; margin-right: 10px;}
+  #status { display: flex; align-items: center; gap: 4px; font-size: 10px; margin-right: 5px;}
   #status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff4444; }
   #status-dot.live { background: #00e676; animation: pulse 2s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
@@ -165,7 +165,7 @@
   <div class="header-titles">
     <div class="title-right">
       <div class="main-title">مطار اللاذقية الدولي</div>
-      <div class="sub-title">نظام الرادار v3.0</div>
+      <div class="sub-title">نظام الرادار v3.2</div>
     </div>
     <div class="title-left">
       <div class="main-title">حركة الطيران المدني</div>
@@ -175,6 +175,7 @@
   
   <div class="header-controls">
     <div id="status"><div id="status-dot"></div><span id="status-text">جاري...</span></div>
+    <button class="top-btn" id="demo-btn" title="وضع المحاكاة للعرض" style="color: #ffa726; border-color: #ffa726;">🎬 محاكاة</button>
     <button class="top-btn" id="refresh-btn" title="تحديث البيانات">🔄</button>
     <button class="top-btn" id="toggle-map-btn" title="تبديل الخريطة">🌍</button>
     <button class="top-btn" id="toggle-rings-btn" title="الدوائر">🎯</button>
@@ -238,6 +239,12 @@
 </div>
 
 <script>
+// ==========================================
+// ** مفاتيح OpenSky الخاصة بك (تم وضعها هنا) **
+// ==========================================
+const OPENSKY_CLIENT_ID = "djsiscajfwvaywf@gmail.com-api-client";      
+const OPENSKY_CLIENT_SECRET = "ORFrKlJuG1EKCQ0PTwAHChMCJFu9MyGd";
+
 const DEFAULT_CONFIG = { name: 'مطار اللاذقية الدولي', lat: 35.4011, lng: 35.9486, radius: 250, ringInterval: 50, showRings: true, darkMap: false, showAirways: true };
 let config = JSON.parse(localStorage.getItem('radar_config') || 'null') || {...DEFAULT_CONFIG};
 
@@ -340,6 +347,73 @@ document.getElementById('toggle-rings-btn').addEventListener('click', () => {
   drawRings();
 });
 
+// ==========================================
+// ** نظام OAuth2 للتوكن **
+// ==========================================
+let openskyAccessToken = null;
+let tokenExpiryTime = 0;
+
+async function getOpenSkyToken() {
+    if (openskyAccessToken && Date.now() < tokenExpiryTime) {
+        return openskyAccessToken;
+    }
+
+    const tokenUrl = 'https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token';
+    const params = new URLSearchParams();
+    params.append('grant_type', 'client_credentials');
+    params.append('client_id', OPENSKY_CLIENT_ID);
+    params.append('client_secret', OPENSKY_CLIENT_SECRET);
+
+    try {
+        const response = await fetch(tokenUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params.toString()
+        });
+
+        if (!response.ok) {
+            throw new Error(`فشل الحصول على التوكن: ${response.status}`);
+        }
+
+        const data = await response.json();
+        openskyAccessToken = data.access_token;
+        tokenExpiryTime = Date.now() + (data.expires_in * 1000) - 60000;
+        
+        console.log('تم الحصول على توكن OpenSky بنجاح');
+        return openskyAccessToken;
+    } catch (error) {
+        console.error('خطأ في OAuth2:', error);
+        return null;
+    }
+}
+
+// ==========================================
+// ** إعدادات وضع المحاكاة (Demo Mode) **
+// ==========================================
+let isDemoMode = false;
+const demoBtn = document.getElementById('demo-btn');
+demoBtn.addEventListener('click', () => {
+    isDemoMode = !isDemoMode;
+    if (isDemoMode) {
+        demoBtn.style.background = '#ffa726';
+        demoBtn.style.color = '#0a1628';
+        demoBtn.style.borderColor = '#ffa726';
+        aircraftStates.forEach(state => {
+            if (state.data.gs === 0 || state.onGround) {
+                state.data.gs = 450;
+                state.velocity = 450 / 1.94384;
+                state.track = state.track || Math.random() * 360;
+                state.onGround = false;
+            }
+        });
+    } else {
+        demoBtn.style.background = 'rgba(255,255,255,0.1)';
+        demoBtn.style.color = '#ffa726';
+        demoBtn.style.borderColor = 'rgba(255,255,255,0.2)';
+        fetchData();
+    }
+});
+
 const refreshBtn = document.getElementById('refresh-btn');
 refreshBtn.addEventListener('click', () => {
   fetchData();
@@ -395,6 +469,8 @@ function popupContent(s) {
 }
 
 async function fetchData() {
+  if (isDemoMode) return;
+
   const dot = document.getElementById('status-dot'), txt = document.getElementById('status-text');
   txt.textContent = 'جاري التحديث...';
   txt.style.color = '#fff';
@@ -404,28 +480,28 @@ async function fetchData() {
   const lomin = (config.lng - 1.5).toFixed(2);
   const lomax = (config.lng + 1.5).toFixed(2);
 
-  // ** الحل السحري: طلب مباشر من OpenSky بدون وسيط **
   const apiUrl = `https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`;
 
   try {
-    const res = await fetch(apiUrl); // طلب مباشر
+    const token = await getOpenSkyToken();
+    if (!token) throw new Error('لا يوجد توكن');
+
+    const res = await fetch(apiUrl, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     
     const states = (data.states || []).map(s => ({
-      hex: s[0],
-      flight: s[1],
-      lon: s[5],
-      lat: s[6],
+      hex: s[0], flight: s[1], lon: s[5], lat: s[6],
       alt_baro: s[7] ? s[7] * 3.28084 : (s[13] ? s[13] * 3.28084 : 0),
-      gs: s[9] ? s[9] * 1.94384 : 0,
-      track: s[10] || 0,
-      squawk: s[14],
-      velocity_ms: s[9] || 0
+      gs: s[9] ? s[9] * 1.94384 : 0, track: s[10] || 0,
+      squawk: s[14], velocity_ms: s[9] || 0
     }));
 
     dot.classList.add('live'); 
-    txt.textContent = 'مباشر - OpenSky'; 
+    txt.textContent = 'مباشر - OpenSky (مسجل)'; 
     txt.style.color = '#00e676';
     
     updateAircraftData(states);
@@ -433,7 +509,6 @@ async function fetchData() {
   } catch (err) {
     console.warn('فشل OpenSky، جاري تجربة السيرفر الاحتياطي...', err.message);
     
-    // ** السيرفر الاحتياطي: adsb.lol عبر الوسيط **
     try {
         const fallbackUrl = `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${Math.round(config.radius * 0.539957)}`;
         const fallbackProxy = `https://radarl.mmdr7104.workers.dev/?url=${encodeURIComponent(fallbackUrl)}&cb=${Date.now()}`;
@@ -455,7 +530,7 @@ async function fetchData() {
 
     } catch (err2) {
         dot.classList.remove('live'); 
-        txt.textContent = 'فشل الاتصال بالسيرفرات';
+        txt.textContent = 'فشل الاتصال';
         txt.style.color = '#ff4444';
     }
   }
@@ -470,10 +545,7 @@ function updateAircraftData(states) {
     seen.add(icao24);
     
     aircraftStates.set(icao24, {
-      lat: s.lat,
-      lon: s.lon,
-      velocity: s.velocity_ms,
-      track: s.track,
+      lat: s.lat, lon: s.lon, velocity: s.velocity_ms, track: s.track,
       onGround: s.alt_baro === 'ground' || s.alt_baro === 0,
       data: s
     });
@@ -482,7 +554,14 @@ function updateAircraftData(states) {
       const icon = aircraftIcon(s.track, s.alt_baro === 'ground');
       const m = L.marker([s.lat, s.lon], { icon }).bindPopup(popupContent(s)).addTo(map);
       
-      m.on('click', () => { selectedAircraftId = icao24; });
+      m.on('click', () => { 
+          selectedAircraftId = icao24; 
+          const state = aircraftStates.get(icao24);
+          const pingTime = new Date().toLocaleTimeString('en-GB'); 
+          document.getElementById('debug-panel').innerText = `TRACKING: ${state.data.flight ? state.data.flight.trim() : icao24}\nPing: ${pingTime}\nLat: ${state.lat.toFixed(5)}\nLon: ${state.lon.toFixed(5)}\nSpd: ${Math.round(state.data.gs * 1.852)} km/h`;
+          document.getElementById('debug-panel').style.display = 'block';
+      });
+      
       m.on('popupclose', () => {
           selectedAircraftId = null;
           document.getElementById('debug-panel').style.display = 'none';
@@ -509,19 +588,28 @@ function continuousAnimation(currentTime) {
 
     aircraftStates.forEach((state, icao24) => {
         const marker = aircraftMarkers.get(icao24);
-        if (!marker || state.onGround || state.velocity === 0) return;
+        if (!marker) return;
 
-        const distance = state.velocity * dt; 
-        const trackRad = state.track * Math.PI / 180;
-        const latRad = state.lat * Math.PI / 180;
+        if (isDemoMode && (state.velocity === 0 || state.onGround)) {
+            state.velocity = 450 / 1.94384;
+            state.track = state.track || (Math.random() * 360);
+            state.onGround = false;
+            state.data.alt_baro = 30000;
+            state.data.gs = 450;
+        }
 
-        const dLat = (distance * Math.cos(trackRad)) / 111320;
-        const dLon = (distance * Math.sin(trackRad)) / (111320 * Math.cos(latRad));
+        if (state.velocity > 0) {
+            const distance = state.velocity * dt; 
+            const trackRad = state.track * Math.PI / 180;
+            const latRad = state.lat * Math.PI / 180;
 
-        state.lat += dLat;
-        state.lon += dLon;
+            const dLat = (distance * Math.cos(trackRad)) / 111320;
+            const dLon = (distance * Math.sin(trackRad)) / (111320 * Math.cos(latRad));
 
-        marker.setLatLng([state.lat, state.lon]);
+            state.lat += dLat;
+            state.lon += dLon;
+            marker.setLatLng([state.lat, state.lon]);
+        }
         
         if (currentTime - lastPopupUpdate > 500) {
             if (selectedAircraftId === icao24) {
@@ -584,7 +672,9 @@ document.getElementById('settings-btn').addEventListener('click', openSettings);
 let fetchTimeout;
 
 function smartFetch() {
-    fetchData();
+    if (!isDemoMode) {
+        fetchData();
+    }
     clearTimeout(fetchTimeout);
     fetchTimeout = setTimeout(smartFetch, 10000);
 }
