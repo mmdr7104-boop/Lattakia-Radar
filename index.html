@@ -17,7 +17,6 @@
   html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
   #map { position: absolute; inset: 0; background: #0a1628; }
   
-  /* الشريط العلوي الجديد */
   #topbar {
     position: absolute; top: 0; left: 0; right: 0; z-index: 1000;
     background: linear-gradient(180deg, #0a1628 0%, #12253f 100%);
@@ -56,7 +55,6 @@
   #status-dot.live { background: #00e676; animation: pulse 2s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
   
-  /* شاشة التشخيص */
   #debug-panel {
     display: none;
     position: absolute; top: 110px; left: 10px; z-index: 1000;
@@ -167,7 +165,7 @@
   <div class="header-titles">
     <div class="title-right">
       <div class="main-title">مطار اللاذقية الدولي</div>
-      <div class="sub-title">نظام الرادار v2.4</div>
+      <div class="sub-title">نظام الرادار v2.6</div>
     </div>
     <div class="title-left">
       <div class="main-title">حركة الطيران المدني</div>
@@ -403,9 +401,8 @@ async function fetchData() {
   txt.style.color = '#fff';
 
   const nmRadius = Math.round(config.radius * 0.539957);
-  
-  // كاسر الكاش العشوائي
   const randomHash = Math.random().toString(36).substring(7);
+  
   const sources = [
     { name: 'adsb.fi', url: `https://opendata.adsb.fi/api/v2/point/${config.lat}/${config.lng}/${nmRadius}?cb=${randomHash}` },
     { name: 'adsb.lol', url: `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${nmRadius}?cb=${randomHash}` },
@@ -432,6 +429,7 @@ async function fetchData() {
       dot.classList.add('live'); 
       txt.textContent = 'مباشر - ' + sources[i].name; 
       txt.style.color = '#00e676';
+      
       updateAircraft(data.ac || []);
       success = true;
       break; 
