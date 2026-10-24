@@ -387,13 +387,11 @@ async function fetchData() {
 
   for (let i = 0; i < sources.length; i++) {
     try {
-      // إضافة كاسر كاش في رابط الوسيط
       const proxyUrl = `https://radarl.mmdr7104.workers.dev/?url=${encodeURIComponent(sources[i].url)}&cb=${Date.now()}`;
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 ثواني مهلة
+      const timeoutId = setTimeout(() => controller.abort(), 3000); 
       
-      // إجبار المتصفح على تجاهل الكاش (cache: 'no-store')
       const res = await fetch(proxyUrl, { signal: controller.signal, cache: 'no-store' });
       clearTimeout(timeoutId);
       
@@ -419,6 +417,28 @@ async function fetchData() {
     txt.textContent = 'فشل الاتصال (' + lastError + ')';
     txt.style.color = '#ff4444';
   }
+}
+
+// ** دالة الحركة الانسيابية **
+function animateMarker(marker, targetLat, targetLng, duration) {
+  const startLat = marker.getLatLng().lat;
+  const startLng = marker.getLatLng().lng;
+  const startTime = performance.now();
+
+  function step(currentTime) {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(elapsed / duration, 1); // من 0 إلى 1
+
+    const currentLat = startLat + (targetLat - startLat) * progress;
+    const currentLng = startLng + (targetLng - startLng) * progress;
+
+    marker.setLatLng([currentLat, currentLng]);
+
+    if (progress < 1) {
+      requestAnimationFrame(step);
+    }
+  }
+  requestAnimationFrame(step);
 }
 
 function updateAircraft(states) {
@@ -448,9 +468,15 @@ function updateAircraft(states) {
       }
     }
 
+    // --- التحرك الانسيابي ---
     if (aircraftMarkers.has(icao24)) {
       const m = aircraftMarkers.get(icao24);
-      m.setLatLng([s.lat, s.lon]); m.setIcon(icon); m.setPopupContent(popupContent(s));
+      m.setIcon(icon); 
+      m.setPopupContent(popupContent(s));
+      
+      // تحريك الطائرة بسلاسة خلال 10 ثواني (لتغطية وقت التحديث)
+      animateMarker(m, s.lat, s.lon, 10000);
+      
     } else {
       const m = L.marker([s.lat, s.lon], { icon }).bindPopup(popupContent(s)).addTo(map);
       aircraftMarkers.set(icao24, m);
