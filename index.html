@@ -165,7 +165,7 @@
   <div class="header-titles">
     <div class="title-right">
       <div class="main-title">مطار اللاذقية الدولي</div>
-      <div class="sub-title">نظام الرادار v2.8</div>
+      <div class="sub-title">نظام الرادار v3.0</div>
     </div>
     <div class="title-left">
       <div class="main-title">حركة الطيران المدني</div>
@@ -394,7 +394,6 @@ function popupContent(s) {
   `;
 }
 
-// التعديل هنا: تمرير الرابط عبر الوسيط
 async function fetchData() {
   const dot = document.getElementById('status-dot'), txt = document.getElementById('status-text');
   txt.textContent = 'جاري التحديث...';
@@ -405,11 +404,11 @@ async function fetchData() {
   const lomin = (config.lng - 1.5).toFixed(2);
   const lomax = (config.lng + 1.5).toFixed(2);
 
+  // ** الحل السحري: طلب مباشر من OpenSky بدون وسيط **
   const apiUrl = `https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`;
-  const proxyUrl = `https://radarl.mmdr7104.workers.dev/?url=${encodeURIComponent(apiUrl)}&cb=${Date.now()}`;
 
   try {
-    const res = await fetch(proxyUrl, { cache: 'no-store' });
+    const res = await fetch(apiUrl); // طلب مباشر
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     
@@ -432,10 +431,33 @@ async function fetchData() {
     updateAircraftData(states);
     
   } catch (err) {
-    console.warn('فشل الاتصال:', err.message);
-    dot.classList.remove('live'); 
-    txt.textContent = 'حظر مؤقت، انتظر قليلاً...';
-    txt.style.color = '#ff4444';
+    console.warn('فشل OpenSky، جاري تجربة السيرفر الاحتياطي...', err.message);
+    
+    // ** السيرفر الاحتياطي: adsb.lol عبر الوسيط **
+    try {
+        const fallbackUrl = `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${Math.round(config.radius * 0.539957)}`;
+        const fallbackProxy = `https://radarl.mmdr7104.workers.dev/?url=${encodeURIComponent(fallbackUrl)}&cb=${Date.now()}`;
+        
+        const res2 = await fetch(fallbackProxy, { cache: 'no-store' });
+        if (!res2.ok) throw new Error('HTTP ' + res2.status);
+        const data2 = await res2.json();
+        
+        const states2 = (data2.ac || []).map(s => ({
+            hex: s.hex, flight: s.flight, lat: s.lat, lon: s.lon,
+            alt_baro: s.alt_baro, gs: s.gs, track: s.track, squawk: s.squawk,
+            velocity_ms: (s.gs || 0) / 1.94384
+        }));
+
+        dot.classList.add('live'); 
+        txt.textContent = 'مباشر - احتياطي'; 
+        txt.style.color = '#00e676';
+        updateAircraftData(states2);
+
+    } catch (err2) {
+        dot.classList.remove('live'); 
+        txt.textContent = 'فشل الاتصال بالسيرفرات';
+        txt.style.color = '#ff4444';
+    }
   }
 }
 
@@ -559,9 +581,27 @@ function saveSettings() {
 function toggleSources() { document.getElementById('sources').classList.toggle('collapsed'); }
 document.getElementById('settings-btn').addEventListener('click', openSettings);
 
+let fetchTimeout;
+
+function smartFetch() {
+    fetchData();
+    clearTimeout(fetchTimeout);
+    fetchTimeout = setTimeout(smartFetch, 10000);
+}
+
+map.on('moveend', () => { clearTimeout(fetchTimeout); smartFetch(); });
+map.on('click', () => { clearTimeout(fetchTimeout); smartFetch(); });
+document.addEventListener('touchstart', () => { clearTimeout(fetchTimeout); smartFetch(); });
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        clearTimeout(fetchTimeout);
+        smartFetch();
+    }
+});
+
 drawCenter();
-fetchData();
-setInterval(fetchData, 10000);
+smartFetch();
 requestAnimationFrame(continuousAnimation);
 </script>
 </body>
