@@ -32,7 +32,7 @@
   #status-dot.live { background: #00e676; animation: pulse 2s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
   
-  /* الشاشة السوداء (مخفية افتراضياً) */
+  /* شاشة التشخيص */
   #debug-panel {
     display: none;
     position: absolute; top: 110px; left: 10px; z-index: 1000;
@@ -137,12 +137,11 @@
 
 <div id="map"></div>
 
-<!-- الشاشة السوداء (مخفية افتراضياً) -->
 <div id="debug-panel"></div>
 
 <div id="topbar">
   <div>
-    <h1>🛩️ مراقبة الحركة الجوية <span style="color:#00e676; font-size:10px;">v2.2</span></h1>
+    <h1>🛩️ مراقبة الحركة الجوية <span style="color:#00e676; font-size:10px;">v2.3</span></h1>
     <div class="subtitle" id="center-label">مطار اللاذقية الدولي</div>
   </div>
   <div style="display:flex; gap:5px; align-items:center;">
@@ -375,10 +374,11 @@ async function fetchData() {
 
   const nmRadius = Math.round(config.radius * 0.539957);
   
+  // إضافة كاسر كاش داخل رابط السيرفر نفسه
   const sources = [
-    { name: 'adsb.fi', url: `https://opendata.adsb.fi/api/v2/point/${config.lat}/${config.lng}/${nmRadius}` },
-    { name: 'adsb.lol', url: `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${nmRadius}` },
-    { name: 'airplanes.live', url: `https://api.airplanes.live/v2/point/${config.lat}/${config.lng}/${nmRadius}` }
+    { name: 'adsb.fi', url: `https://opendata.adsb.fi/api/v2/point/${config.lat}/${config.lng}/${nmRadius}?t=${Date.now()}` },
+    { name: 'adsb.lol', url: `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${nmRadius}?t=${Date.now()}` },
+    { name: 'airplanes.live', url: `https://api.airplanes.live/v2/point/${config.lat}/${config.lng}/${nmRadius}?t=${Date.now()}` }
   ];
 
   let success = false;
@@ -448,9 +448,10 @@ function updateAircraft(states) {
     const icao24 = s.hex;
     seen.add(icao24);
     
-    // تحديث شاشة التشخيص فقط إذا كانت هذه هي الطائرة المحددة
     if (selectedAircraftId === icao24) {
-        debugText = `TRACKING: ${s.flight ? s.flight.trim() : icao24}\nLat: ${s.lat.toFixed(5)}\nLon: ${s.lon.toFixed(5)}\nSpd: ${Math.round((s.gs||0)*1.852)} km/h\nSeen: ${s.seen}s`;
+        // Ping يثبت أن الطلب تم إرساله للتو
+        const pingTime = new Date().toLocaleTimeString('en-GB'); 
+        debugText = `TRACKING: ${s.flight ? s.flight.trim() : icao24}\nPing: ${pingTime}\nLat: ${s.lat.toFixed(5)}\nLon: ${s.lon.toFixed(5)}\nSpd: ${Math.round((s.gs||0)*1.852)} km/h`;
     }
 
     if (!aircraftTrails.has(icao24)) {
@@ -481,15 +482,14 @@ function updateAircraft(states) {
     } else {
       const m = L.marker([s.lat, s.lon], { icon }).bindPopup(popupContent(s)).addTo(map);
       
-      // عند الضغط: إظهار الشاشة السوداء وتحديثها فوراً
       m.on('click', () => { 
           selectedAircraftId = icao24; 
           const debugPanel = document.getElementById('debug-panel');
           debugPanel.style.display = 'block';
-          debugPanel.innerText = `TRACKING: ${s.flight ? s.flight.trim() : icao24}\nLat: ${s.lat.toFixed(5)}\nLon: ${s.lon.toFixed(5)}\nSpd: ${Math.round((s.gs||0)*1.852)} km/h\nSeen: ${s.seen}s`;
+          const pingTime = new Date().toLocaleTimeString('en-GB');
+          debugPanel.innerText = `TRACKING: ${s.flight ? s.flight.trim() : icao24}\nPing: ${pingTime}\nLat: ${s.lat.toFixed(5)}\nLon: ${s.lon.toFixed(5)}\nSpd: ${Math.round((s.gs||0)*1.852)} km/h`;
       });
 
-      // عند إغلاق النافذة: إخفاء الشاشة السوداء
       m.on('popupclose', () => {
           selectedAircraftId = null;
           document.getElementById('debug-panel').style.display = 'none';
@@ -499,7 +499,6 @@ function updateAircraft(states) {
     }
   }
   
-  // تحديث مستمر للشاشة السوداء طالما في طائرة محددة
   if (selectedAircraftId && seen.has(selectedAircraftId)) {
       document.getElementById('debug-panel').innerText = debugText;
   }
