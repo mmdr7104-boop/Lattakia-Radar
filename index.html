@@ -165,7 +165,7 @@
   <div class="header-titles">
     <div class="title-right">
       <div class="main-title">مطار اللاذقية الدولي</div>
-      <div class="sub-title">نظام الرادار v3.2</div>
+      <div class="sub-title">نظام الرادار v3.4</div>
     </div>
     <div class="title-left">
       <div class="main-title">حركة الطيران المدني</div>
@@ -175,7 +175,7 @@
   
   <div class="header-controls">
     <div id="status"><div id="status-dot"></div><span id="status-text">جاري...</span></div>
-    <button class="top-btn" id="demo-btn" title="وضع المحاكاة للعرض" style="color: #ffa726; border-color: #ffa726;">🎬 محاكاة</button>
+    <!-- تم حذف زر المحاكاة -->
     <button class="top-btn" id="refresh-btn" title="تحديث البيانات">🔄</button>
     <button class="top-btn" id="toggle-map-btn" title="تبديل الخريطة">🌍</button>
     <button class="top-btn" id="toggle-rings-btn" title="الدوائر">🎯</button>
@@ -239,9 +239,7 @@
 </div>
 
 <script>
-// ==========================================
-// ** مفاتيح OpenSky الخاصة بك (تم وضعها هنا) **
-// ==========================================
+// مفاتيح OpenSky الخاصة بك
 const OPENSKY_CLIENT_ID = "djsiscajfwvaywf@gmail.com-api-client";      
 const OPENSKY_CLIENT_SECRET = "ORFrKlJuG1EKCQ0PTwAHChMCJFu9MyGd";
 
@@ -348,15 +346,13 @@ document.getElementById('toggle-rings-btn').addEventListener('click', () => {
 });
 
 // ==========================================
-// ** نظام OAuth2 للتوكن **
+// ** نظام OAuth2 للتوكن (مع التشخيص) **
 // ==========================================
 let openskyAccessToken = null;
 let tokenExpiryTime = 0;
 
 async function getOpenSkyToken() {
-    if (openskyAccessToken && Date.now() < tokenExpiryTime) {
-        return openskyAccessToken;
-    }
+    if (openskyAccessToken && Date.now() < tokenExpiryTime) return openskyAccessToken;
 
     const tokenUrl = 'https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token';
     const params = new URLSearchParams();
@@ -372,47 +368,22 @@ async function getOpenSkyToken() {
         });
 
         if (!response.ok) {
-            throw new Error(`فشل الحصول على التوكن: ${response.status}`);
+            const errData = await response.text();
+            throw new Error(`HTTP ${response.status}: ${errData}`);
         }
 
         const data = await response.json();
         openskyAccessToken = data.access_token;
         tokenExpiryTime = Date.now() + (data.expires_in * 1000) - 60000;
         
-        console.log('تم الحصول على توكن OpenSky بنجاح');
         return openskyAccessToken;
     } catch (error) {
-        console.error('خطأ في OAuth2:', error);
+        // عرض رسالة الخطأ للمطور (أنت) عشان تعرف السبب
+        alert("فشل تسجيل الدخول لـ OpenSky:\n" + error.message + "\n\nملاحظة: قد يكون السبب هو حظر الـ CORS من المتصفح. جرب متصفح آخر أو تأكد من صحة المفاتيح.");
+        console.error('خطأ OAuth2:', error);
         return null;
     }
 }
-
-// ==========================================
-// ** إعدادات وضع المحاكاة (Demo Mode) **
-// ==========================================
-let isDemoMode = false;
-const demoBtn = document.getElementById('demo-btn');
-demoBtn.addEventListener('click', () => {
-    isDemoMode = !isDemoMode;
-    if (isDemoMode) {
-        demoBtn.style.background = '#ffa726';
-        demoBtn.style.color = '#0a1628';
-        demoBtn.style.borderColor = '#ffa726';
-        aircraftStates.forEach(state => {
-            if (state.data.gs === 0 || state.onGround) {
-                state.data.gs = 450;
-                state.velocity = 450 / 1.94384;
-                state.track = state.track || Math.random() * 360;
-                state.onGround = false;
-            }
-        });
-    } else {
-        demoBtn.style.background = 'rgba(255,255,255,0.1)';
-        demoBtn.style.color = '#ffa726';
-        demoBtn.style.borderColor = 'rgba(255,255,255,0.2)';
-        fetchData();
-    }
-});
 
 const refreshBtn = document.getElementById('refresh-btn');
 refreshBtn.addEventListener('click', () => {
@@ -469,8 +440,6 @@ function popupContent(s) {
 }
 
 async function fetchData() {
-  if (isDemoMode) return;
-
   const dot = document.getElementById('status-dot'), txt = document.getElementById('status-text');
   txt.textContent = 'جاري التحديث...';
   txt.style.color = '#fff';
@@ -486,9 +455,7 @@ async function fetchData() {
     const token = await getOpenSkyToken();
     if (!token) throw new Error('لا يوجد توكن');
 
-    const res = await fetch(apiUrl, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
+    const res = await fetch(apiUrl, { headers: { 'Authorization': `Bearer ${token}` } });
     
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
@@ -590,15 +557,7 @@ function continuousAnimation(currentTime) {
         const marker = aircraftMarkers.get(icao24);
         if (!marker) return;
 
-        if (isDemoMode && (state.velocity === 0 || state.onGround)) {
-            state.velocity = 450 / 1.94384;
-            state.track = state.track || (Math.random() * 360);
-            state.onGround = false;
-            state.data.alt_baro = 30000;
-            state.data.gs = 450;
-        }
-
-        if (state.velocity > 0) {
+        if (state.velocity > 0 && !state.onGround) {
             const distance = state.velocity * dt; 
             const trackRad = state.track * Math.PI / 180;
             const latRad = state.lat * Math.PI / 180;
@@ -672,9 +631,7 @@ document.getElementById('settings-btn').addEventListener('click', openSettings);
 let fetchTimeout;
 
 function smartFetch() {
-    if (!isDemoMode) {
-        fetchData();
-    }
+    fetchData();
     clearTimeout(fetchTimeout);
     fetchTimeout = setTimeout(smartFetch, 10000);
 }
@@ -695,4 +652,4 @@ smartFetch();
 requestAnimationFrame(continuousAnimation);
 </script>
 </body>
-</html>
+  </html>
