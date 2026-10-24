@@ -27,23 +27,12 @@
     border-bottom: 2px solid #00e676;
   }
   
-  .header-titles {
-    display: flex; justify-content: space-between; align-items: flex-start;
-    width: 100%;
-  }
-  
+  .header-titles { display: flex; justify-content: space-between; align-items: flex-start; width: 100%; }
   .title-right { text-align: right; }
   .title-left { text-align: left; }
   
-  .main-title {
-    font-size: 16px; font-weight: 800; color: #fff; letter-spacing: 0.5px;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-  }
-  
-  .sub-title {
-    font-size: 11px; color: #00e676; font-family: monospace; font-weight: bold; margin-top: 2px;
-    letter-spacing: 1px;
-  }
+  .main-title { font-size: 16px; font-weight: 800; color: #fff; letter-spacing: 0.5px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+  .sub-title { font-size: 11px; color: #00e676; font-family: monospace; font-weight: bold; margin-top: 2px; letter-spacing: 1px; }
 
   .header-controls {
     display: flex; justify-content: center; align-items: center; gap: 6px;
@@ -57,8 +46,7 @@
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
   
   #debug-panel {
-    display: none;
-    position: absolute; top: 110px; left: 10px; z-index: 1000;
+    display: none; position: absolute; top: 110px; left: 10px; z-index: 1000;
     background: rgba(0,0,0,0.85); color: #00e676; padding: 10px;
     font-family: monospace; font-size: 12px; border-radius: 5px;
     border: 1px solid #00e676; direction: ltr; pointer-events: none;
@@ -69,14 +57,10 @@
     position: absolute; bottom: 0; left: 0; right: 0; z-index: 1000;
     background: linear-gradient(135deg, #0a1628 0%, #1a2f4a 100%);
     border-radius: 16px 16px 0 0; color: #fff; padding: 12px 12px 20px;
-    box-shadow: 0 -4px 20px rgba(0,0,0,0.4);
-    transition: transform 0.3s ease;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.4); transition: transform 0.3s ease;
   }
   #sources.collapsed { transform: translateY(calc(100% - 45px)); }
-  #sources-header {
-    display: flex; justify-content: space-between; align-items: center;
-    padding-bottom: 8px; cursor: pointer;
-  }
+  #sources-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; cursor: pointer; }
   #sources-header .title { font-size: 13px; font-weight: 600; }
   #toggle-collapse { font-size: 18px; transition: transform 0.3s; }
   #sources.collapsed #toggle-collapse { transform: rotate(180deg); }
@@ -159,14 +143,13 @@
 <body>
 
 <div id="map"></div>
-
 <div id="debug-panel"></div>
 
 <div id="topbar">
   <div class="header-titles">
     <div class="title-right">
       <div class="main-title">مطار اللاذقية الدولي</div>
-      <div class="sub-title">نظام الرادار v3.8</div>
+      <div class="sub-title">نظام الرادار v4.0</div>
     </div>
     <div class="title-left">
       <div class="main-title">حركة الطيران المدني</div>
@@ -239,16 +222,10 @@
 </div>
 
 <script>
-const OPENSKY_CLIENT_ID = "djsiscajfwvaywf@gmail.com-api-client";      
-const OPENSKY_CLIENT_SECRET = "ORFrKlJuG1EKCQ0PTwAHChMCJFu9MyGd";
+const WORKER_URL = "https://radarl.mmdr7104.workers.dev"; // عنوان الـ Worker الخاص بك
 
 const DEFAULT_CONFIG = { name: 'مطار اللاذقية الدولي', lat: 35.4011, lng: 35.9486, radius: 250, ringInterval: 50, showRings: true, darkMap: false, showAirways: true };
 let config = JSON.parse(localStorage.getItem('radar_config') || 'null') || {...DEFAULT_CONFIG};
-
-if (config.ringInterval === undefined) config.ringInterval = 50;
-if (config.showRings === undefined) config.showRings = true;
-if (config.darkMap === undefined) config.darkMap = false;
-if (config.showAirways === undefined) config.showAirways = true;
 
 const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([config.lat, config.lng], 9);
 const darkMapLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 });
@@ -344,51 +321,6 @@ document.getElementById('toggle-rings-btn').addEventListener('click', () => {
   drawRings();
 });
 
-let openskyAccessToken = null;
-let tokenExpiryTime = 0;
-
-async function fetchWithTimeout(url, options, timeout = 3000) {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeout);
-    try {
-        const response = await fetch(url, { ...options, signal: controller.signal });
-        clearTimeout(id);
-        return response;
-    } catch (e) {
-        clearTimeout(id);
-        throw e;
-    }
-}
-
-async function getOpenSkyToken() {
-    if (openskyAccessToken && Date.now() < tokenExpiryTime) return openskyAccessToken;
-
-    const originalTokenUrl = 'https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token';
-    const tokenUrl = `https://radarl.mmdr7104.workers.dev/?url=${encodeURIComponent(originalTokenUrl)}`;
-
-    const params = new URLSearchParams();
-    params.append('grant_type', 'client_credentials');
-    params.append('client_id', OPENSKY_CLIENT_ID);
-    params.append('client_secret', OPENSKY_CLIENT_SECRET);
-
-    try {
-        const response = await fetchWithTimeout(tokenUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: params.toString()
-        }, 2500);
-
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
-        
-        openskyAccessToken = data.access_token;
-        tokenExpiryTime = Date.now() + (data.expires_in * 1000) - 60000;
-        return openskyAccessToken;
-    } catch (error) {
-        return null;
-    }
-}
-
 const refreshBtn = document.getElementById('refresh-btn');
 refreshBtn.addEventListener('click', () => {
   fetchData();
@@ -405,9 +337,11 @@ function clearCache() {
 
 const aircraftMarkers = new Map();
 const aircraftStates = new Map();
+const aircraftTrails = new Map();
 let selectedAircraftId = null;
 let lastAnimationTime = performance.now();
 let lastPopupUpdate = 0;
+let isFetching = false; // لمنع تداخل الطلبات
 
 function aircraftIcon(heading, onGround) {
   const color = onGround ? '#ffa726' : '#00e676';
@@ -443,64 +377,50 @@ function popupContent(s) {
   `;
 }
 
+// دالة التحديث الجديدة (تستخدم Worker + فحص حداثة البيانات)
 async function fetchData() {
+  if (isFetching) return;
+  isFetching = true;
+  
   const dot = document.getElementById('status-dot'), txt = document.getElementById('status-text');
-  txt.textContent = 'جاري التحديث...';
+  txt.textContent = 'جاري...';
   txt.style.color = '#fff';
 
-  const lamin = (config.lat - 1.5).toFixed(2);
-  const lamax = (config.lat + 1.5).toFixed(2);
-  const lomin = (config.lng - 1.5).toFixed(2);
-  const lomax = (config.lng + 1.5).toFixed(2);
-
-  const apiUrl = `https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`;
+  const workerUrl = `${WORKER_URL}?lat=${config.lat}&lng=${config.lng}&radius=${config.radius}`;
 
   try {
-    const token = await getOpenSkyToken();
-    if (!token) throw new Error('No Token');
-
-    const res = await fetchWithTimeout(apiUrl, { headers: { 'Authorization': `Bearer ${token}` } }, 2500);
-    
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const res = await fetch(workerUrl, { cache: 'no-store' });
     const data = await res.json();
+
+    if (!data.success) throw new Error(data.error || 'Worker Error');
+
+    dot.classList.add('live'); 
+    txt.textContent = 'مباشر - Worker'; 
+    txt.style.color = '#00e676';
     
-    const states = (data.states || []).map(s => ({
+    // فحص البيانات قبل العرض
+    const validStates = (data.states || []).filter(s => {
+      // s[3] هو وقت آخر رصد (time_position)
+      const timePos = s[3];
+      if (!timePos) return false;
+      const age = (Date.now() / 1000) - timePos;
+      return age < 120; // نقبل البيانات اللي عمرها أقل من دقيقتين
+    }).map(s => ({
       hex: s[0], flight: s[1], lon: s[5], lat: s[6],
       alt_baro: s[7] ? s[7] * 3.28084 : (s[13] ? s[13] * 3.28084 : 0),
       gs: s[9] ? s[9] * 1.94384 : 0, track: s[10] || 0,
       squawk: s[14], velocity_ms: s[9] || 0
     }));
 
-    dot.classList.add('live'); 
-    txt.textContent = 'مباشر - OpenSky'; 
-    txt.style.color = '#00e676';
-    updateAircraftData(states);
+    updateAircraftData(validStates);
     
   } catch (err) {
-    try {
-        const fallbackUrl = `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${Math.round(config.radius * 0.539957)}`;
-        const fallbackProxy = `https://radarl.mmdr7104.workers.dev/?url=${encodeURIComponent(fallbackUrl)}&cb=${Date.now()}`;
-        
-        const res2 = await fetchWithTimeout(fallbackProxy, { cache: 'no-store' }, 2500);
-        if (!res2.ok) throw new Error('HTTP ' + res2.status);
-        const data2 = await res2.json();
-        
-        const states2 = (data2.ac || []).map(s => ({
-            hex: s.hex, flight: s.flight, lat: s.lat, lon: s.lon,
-            alt_baro: s.alt_baro, gs: s.gs, track: s.track, squawk: s.squawk,
-            velocity_ms: (s.gs || 0) / 1.94384
-        }));
-
-        dot.classList.add('live'); 
-        txt.textContent = 'مباشر - احتياطي'; 
-        txt.style.color = '#00e676';
-        updateAircraftData(states2);
-
-    } catch (err2) {
-        dot.classList.remove('live'); 
-        txt.textContent = 'انقطع الاتصال - انتظر...';
-        txt.style.color = '#ff4444';
-    }
+    console.error('Fetch Error:', err);
+    dot.classList.remove('live'); 
+    txt.textContent = 'فشل التحديث';
+    txt.style.color = '#ff4444';
+  } finally {
+    isFetching = false;
   }
 }
 
@@ -517,6 +437,18 @@ function updateAircraftData(states) {
       onGround: s.alt_baro === 'ground' || s.alt_baro === 0,
       data: s
     });
+
+    if (!aircraftTrails.has(icao24)) aircraftTrails.set(icao24, { points: [], line: null });
+    const trailData = aircraftTrails.get(icao24);
+    const lastPoint = trailData.points[trailData.points.length - 1];
+    
+    if (!lastPoint || (lastPoint[0] !== s.lat || lastPoint[1] !== s.lon)) {
+      trailData.points.push([s.lat, s.lon]);
+      if (trailData.points.length > 30) trailData.points.shift();
+
+      if (trailData.line) trailData.line.setLatLngs(trailData.points);
+      else trailData.line = L.polyline(trailData.points, { color: '#00e676', weight: 3, opacity: 0.6, dashArray: '4, 4' }).addTo(map);
+    }
 
     if (!aircraftMarkers.has(icao24)) {
       const icon = aircraftIcon(s.track, s.alt_baro === 'ground');
@@ -546,6 +478,11 @@ function updateAircraftData(states) {
   for (const [k, m] of aircraftMarkers.entries()) {
     if (!seen.has(k)) { 
       map.removeLayer(m); aircraftMarkers.delete(k); aircraftStates.delete(k);
+      if (aircraftTrails.has(k)) {
+        const trail = aircraftTrails.get(k);
+        if (trail.line) map.removeLayer(trail.line);
+        aircraftTrails.delete(k);
+      }
     }
   }
 }
@@ -562,12 +499,9 @@ function continuousAnimation(currentTime) {
             const distance = state.velocity * dt; 
             const trackRad = state.track * Math.PI / 180;
             const latRad = state.lat * Math.PI / 180;
-
             const dLat = (distance * Math.cos(trackRad)) / 111320;
             const dLon = (distance * Math.sin(trackRad)) / (111320 * Math.cos(latRad));
-
-            state.lat += dLat;
-            state.lon += dLon;
+            state.lat += dLat; state.lon += dLon;
             marker.setLatLng([state.lat, state.lon]);
         }
         
@@ -575,11 +509,8 @@ function continuousAnimation(currentTime) {
             if (selectedAircraftId === icao24) {
                 const pingTime = new Date().toLocaleTimeString('en-GB'); 
                 document.getElementById('debug-panel').innerText = `TRACKING: ${state.data.flight ? state.data.flight.trim() : icao24}\nPing: ${pingTime}\nLat: ${state.lat.toFixed(5)}\nLon: ${state.lon.toFixed(5)}\nSpd: ${Math.round(state.data.gs * 1.852)} km/h`;
-                document.getElementById('debug-panel').style.display = 'block';
-
                 if (marker.isPopupOpen()) {
-                    state.data.lat = state.lat;
-                    state.data.lon = state.lon;
+                    state.data.lat = state.lat; state.data.lon = state.lon;
                     marker.setPopupContent(popupContent(state.data));
                 }
             }
@@ -590,28 +521,14 @@ function continuousAnimation(currentTime) {
     requestAnimationFrame(continuousAnimation);
 }
 
-document.querySelectorAll('.source-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const src = btn.dataset.source;
-    if (btn.classList.contains('placeholder')) {
-      btn.classList.add('active');
-      setTimeout(() => btn.classList.remove('active'), 500);
-      alert('هذا المصدر غير مهيأ بعد.');
-      return;
-    }
-    activeSources[src] = !activeSources[src];
-    btn.classList.toggle('active', activeSources[src]);
-  });
-});
-
-function openSettings() {
+document.getElementById('settings-btn').addEventListener('click', () => {
   document.getElementById('input-name').value = config.name;
   document.getElementById('input-lat').value = config.lat;
   document.getElementById('input-lng').value = config.lng;
   document.getElementById('input-radius').value = config.radius;
   document.getElementById('input-ring-interval').value = config.ringInterval;
   document.getElementById('settings-modal').classList.add('show');
-}
+});
 function closeSettings() { document.getElementById('settings-modal').classList.remove('show'); }
 function saveSettings() {
   config.name = document.getElementById('input-name').value;
@@ -627,30 +544,29 @@ function saveSettings() {
   fetchData();
 }
 function toggleSources() { document.getElementById('sources').classList.toggle('collapsed'); }
-document.getElementById('settings-btn').addEventListener('click', openSettings);
 
-let fetchTimeout;
+// نظام التحديث الذكي (لا يبدأ طلباً جديداً قبل انتهاء السابق)
+let stopped = false;
+let timer = null;
 
-function smartFetch() {
-    fetchData();
-    clearTimeout(fetchTimeout);
-    fetchTimeout = setTimeout(smartFetch, 10000);
+async function updateLoop() {
+    if (stopped) return;
+    await fetchData();
+    if (!stopped) {
+        timer = setTimeout(updateLoop, 15000); // كل 15 ثانية
+    }
 }
 
-map.on('moveend', () => { clearTimeout(fetchTimeout); smartFetch(); });
-map.on('click', () => { clearTimeout(fetchTimeout); smartFetch(); });
-document.addEventListener('touchstart', () => { clearTimeout(fetchTimeout); smartFetch(); });
-
-document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-        clearTimeout(fetchTimeout);
-        smartFetch();
-    }
-});
-
+// تشغيل أول مرة
 drawCenter();
-smartFetch();
+updateLoop();
 requestAnimationFrame(continuousAnimation);
+
+// إيقاف التحديث عند إغلاق الصفحة
+window.addEventListener('beforeunload', () => {
+    stopped = true;
+    clearTimeout(timer);
+});
 </script>
 </body>
 </html>
