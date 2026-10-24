@@ -165,7 +165,7 @@
   <div class="header-titles">
     <div class="title-right">
       <div class="main-title">مطار اللاذقية الدولي</div>
-      <div class="sub-title">نظام الرادار v2.6</div>
+      <div class="sub-title">نظام الرادار v2.7</div>
     </div>
     <div class="title-left">
       <div class="main-title">حركة الطيران المدني</div>
@@ -355,9 +355,10 @@ function clearCache() {
 }
 
 const aircraftMarkers = new Map();
-const aircraftTrails = new Map();
-const activeSources = { opensky: true, atc: false, ploto: false, near: false, ads: false };
+const aircraftStates = new Map(); // لتخزين حالة الطائرة للحركة المستمرة
 let selectedAircraftId = null;
+let lastAnimationTime = performance.now();
+let lastPopupUpdate = 0;
 
 function aircraftIcon(heading, onGround) {
   const color = onGround ? '#ffa726' : '#00e676';
@@ -377,7 +378,7 @@ function distanceKm(lat1, lon1, lat2, lon2) {
 function popupContent(s) {
   const dist = distanceKm(config.lat, config.lng, s.lat, s.lon);
   const isGround = s.alt_baro === 'ground';
-  const altFt = isGround ? 0 : (s.alt_baro || s.alt_geom || 0);
+  const altFt = isGround ? 0 : (s.alt_baro || 0);
   const altM = Math.round(altFt * 0.3048);
   const speed = Math.round((s.gs || 0) * 1.852);
   const callsign = (s.flight || '').trim() || s.hex.toUpperCase();
@@ -393,154 +394,144 @@ function popupContent(s) {
   `;
 }
 
+// جلب البيانات من OpenSky
 async function fetchData() {
-  if (!activeSources.opensky) return;
   const dot = document.getElementById('status-dot'), txt = document.getElementById('status-text');
-  
-  txt.textContent = 'جاري...';
+  txt.textContent = 'جاري التحديث...';
   txt.style.color = '#fff';
 
-  const nmRadius = Math.round(config.radius * 0.539957);
-  const randomHash = Math.random().toString(36).substring(7);
-  
-  const sources = [
-    { name: 'adsb.fi', url: `https://opendata.adsb.fi/api/v2/point/${config.lat}/${config.lng}/${nmRadius}?cb=${randomHash}` },
-    { name: 'adsb.lol', url: `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${nmRadius}?cb=${randomHash}` },
-    { name: 'airplanes.live', url: `https://api.airplanes.live/v2/point/${config.lat}/${config.lng}/${nmRadius}?cb=${randomHash}` }
-  ];
+  const lamin = (config.lat - 1.5).toFixed(2);
+  const lamax = (config.lat + 1.5).toFixed(2);
+  const lomin = (config.lng - 1.5).toFixed(2);
+  const lomax = (config.lng + 1.5).toFixed(2);
 
-  let success = false;
-  let lastError = '';
+  const apiUrl = `https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`;
 
-  for (let i = 0; i < sources.length; i++) {
-    try {
-      const proxyUrl = `https://radarl.mmdr7104.workers.dev/?url=${encodeURIComponent(sources[i].url)}&cb=${Date.now()}`;
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000); 
-      
-      const res = await fetch(proxyUrl, { signal: controller.signal, cache: 'no-store' });
-      clearTimeout(timeoutId);
-      
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      
-      const data = await res.json();
-      
-      dot.classList.add('live'); 
-      txt.textContent = 'مباشر - ' + sources[i].name; 
-      txt.style.color = '#00e676';
-      
-      updateAircraft(data.ac || []);
-      success = true;
-      break; 
-      
-    } catch (err) {
-      console.warn(`فشل المصدر ${sources[i].name}:`, err.message);
-      lastError = err.message;
-    }
-  }
+  try {
+    const res = await fetch(apiUrl);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    
+    const states = (data.states || []).map(s => ({
+      hex: s[0],
+      flight: s[1],
+      lon: s[5],
+      lat: s[6],
+      alt_baro: s[7] ? s[7] * 3.28084 : (s[13] ? s[13] * 3.28084 : 0),
+      gs: s[9] ? s[9] * 1.94384 : 0, // knots
+      track: s[10] || 0,
+      squawk: s[14],
+      velocity_ms: s[9] || 0 // متر/ثانية للحركة
+    }));
 
-  if (!success) {
+    dot.classList.add('live'); 
+    txt.textContent = 'مباشر - OpenSky'; 
+    txt.style.color = '#00e676';
+    
+    updateAircraftData(states);
+    
+  } catch (err) {
+    console.warn('فشل الاتصال:', err.message);
     dot.classList.remove('live'); 
-    txt.textContent = 'فشل الاتصال (' + lastError + ')';
+    txt.textContent = 'فشل الاتصال (حظر مؤقت)';
     txt.style.color = '#ff4444';
   }
 }
 
-function animateMarker(marker, targetLat, targetLng, duration) {
-  const startLat = marker.getLatLng().lat;
-  const startLng = marker.getLatLng().lng;
-  const startTime = performance.now();
-
-  function step(currentTime) {
-    const elapsed = currentTime - startTime;
-    const progress = Math.min(elapsed / duration, 1); 
-
-    const currentLat = startLat + (targetLat - startLat) * progress;
-    const currentLng = startLng + (targetLng - startLng) * progress;
-
-    marker.setLatLng([currentLat, currentLng]);
-
-    if (progress < 1) {
-      requestAnimationFrame(step);
-    }
-  }
-  requestAnimationFrame(step);
-}
-
-function updateAircraft(states) {
+// تحديث البيانات وتخزين حالة الطائرة للحركة المستمرة
+function updateAircraftData(states) {
   const seen = new Set();
-  let debugText = "";
   
   for (const s of states) {
     if (s.lat == null || s.lon == null) continue;
     const icao24 = s.hex;
     seen.add(icao24);
     
-    if (selectedAircraftId === icao24) {
-        const pingTime = new Date().toLocaleTimeString('en-GB'); 
-        debugText = `TRACKING: ${s.flight ? s.flight.trim() : icao24}\nPing: ${pingTime}\nLat: ${s.lat.toFixed(5)}\nLon: ${s.lon.toFixed(5)}\nSpd: ${Math.round((s.gs||0)*1.852)} km/h`;
-    }
+    // تحديث حالة الطائرة (نقطة البداية للحركة)
+    aircraftStates.set(icao24, {
+      lat: s.lat,
+      lon: s.lon,
+      velocity: s.velocity_ms,
+      track: s.track,
+      onGround: s.alt_baro === 'ground' || s.alt_baro === 0,
+      data: s
+    });
 
-    if (!aircraftTrails.has(icao24)) {
-       aircraftTrails.set(icao24, { points: [], line: null });
-    }
-    
-    const trailData = aircraftTrails.get(icao24);
-    const lastPoint = trailData.points[trailData.points.length - 1];
-    
-    if (!lastPoint || (lastPoint[0] !== s.lat || lastPoint[1] !== s.lon)) {
-      trailData.points.push([s.lat, s.lon]);
-      if (trailData.points.length > 30) { trailData.points.shift(); }
-
-      if (trailData.line) {
-        trailData.line.setLatLngs(trailData.points);
-      } else {
-        trailData.line = L.polyline(trailData.points, { color: '#00e676', weight: 3, opacity: 0.6, dashArray: '2, 4' }).addTo(map);
-      }
-    }
-
-    const icon = aircraftIcon(s.track || 0, s.alt_baro === 'ground');
-
-    if (aircraftMarkers.has(icao24)) {
-      const m = aircraftMarkers.get(icao24);
-      m.setIcon(icon); 
-      m.setPopupContent(popupContent(s));
-      animateMarker(m, s.lat, s.lon, 4500);
-    } else {
+    if (!aircraftMarkers.has(icao24)) {
+      const icon = aircraftIcon(s.track, s.alt_baro === 'ground');
       const m = L.marker([s.lat, s.lon], { icon }).bindPopup(popupContent(s)).addTo(map);
       
       m.on('click', () => { 
           selectedAircraftId = icao24; 
-          const debugPanel = document.getElementById('debug-panel');
-          debugPanel.style.display = 'block';
-          const pingTime = new Date().toLocaleTimeString('en-GB');
-          debugPanel.innerText = `TRACKING: ${s.flight ? s.flight.trim() : icao24}\nPing: ${pingTime}\nLat: ${s.lat.toFixed(5)}\nLon: ${s.lon.toFixed(5)}\nSpd: ${Math.round((s.gs||0)*1.852)} km/h`;
       });
-
+      
       m.on('popupclose', () => {
           selectedAircraftId = null;
           document.getElementById('debug-panel').style.display = 'none';
       });
 
       aircraftMarkers.set(icao24, m);
+    } else {
+      const m = aircraftMarkers.get(icao24);
+      m.setIcon(aircraftIcon(s.track, s.alt_baro === 'ground'));
+      m.setPopupContent(popupContent(s));
     }
   }
   
-  if (selectedAircraftId && seen.has(selectedAircraftId)) {
-      document.getElementById('debug-panel').innerText = debugText;
-  }
-  
+  // حذف الطائرات التي اختفت
   for (const [k, m] of aircraftMarkers.entries()) {
     if (!seen.has(k)) { 
-      map.removeLayer(m); aircraftMarkers.delete(k); 
-      if (aircraftTrails.has(k)) {
-        const trail = aircraftTrails.get(k);
-        if (trail.line) map.removeLayer(trail.line);
-        aircraftTrails.delete(k);
-      }
+      map.removeLayer(m); 
+      aircraftMarkers.delete(k); 
+      aircraftStates.delete(k);
     }
   }
+}
+
+// محرك الحركة المستمرة (السر في العرض الاحترافي)
+function continuousAnimation(currentTime) {
+    const dt = (currentTime - lastAnimationTime) / 1000;
+    lastAnimationTime = currentTime;
+
+    aircraftStates.forEach((state, icao24) => {
+        const marker = aircraftMarkers.get(icao24);
+        if (!marker || state.onGround || state.velocity === 0) return;
+
+        // حساب المسافة المقطوعة في هذه الأجزاء من الثانية
+        const distance = state.velocity * dt; 
+        const trackRad = state.track * Math.PI / 180;
+        const latRad = state.lat * Math.PI / 180;
+
+        // تحويل الأمتار إلى إحداثيات
+        const dLat = (distance * Math.cos(trackRad)) / 111320;
+        const dLon = (distance * Math.sin(trackRad)) / (111320 * Math.cos(latRad));
+
+        state.lat += dLat;
+        state.lon += dLon;
+
+        marker.setLatLng([state.lat, state.lon]);
+        
+        // تحديث شاشة التشخيص والنافذة كل 500 ملي ثانية
+        if (currentTime - lastPopupUpdate > 500) {
+            if (selectedAircraftId === icao24) {
+                const pingTime = new Date().toLocaleTimeString('en-GB'); 
+                document.getElementById('debug-panel').innerText = `TRACKING: ${state.data.flight ? state.data.flight.trim() : icao24}\nPing: ${pingTime}\nLat: ${state.lat.toFixed(5)}\nLon: ${state.lon.toFixed(5)}\nSpd: ${Math.round(state.data.gs * 1.852)} km/h`;
+                document.getElementById('debug-panel').style.display = 'block';
+
+                if (marker.isPopupOpen()) {
+                    state.data.lat = state.lat;
+                    state.data.lon = state.lon;
+                    marker.setPopupContent(popupContent(state.data));
+                }
+            }
+        }
+    });
+
+    if (currentTime - lastPopupUpdate > 500) {
+        lastPopupUpdate = currentTime;
+    }
+
+    requestAnimationFrame(continuousAnimation);
 }
 
 document.querySelectorAll('.source-btn').forEach(btn => {
@@ -554,18 +545,6 @@ document.querySelectorAll('.source-btn').forEach(btn => {
     }
     activeSources[src] = !activeSources[src];
     btn.classList.toggle('active', activeSources[src]);
-    if (src === 'opensky') {
-      if (activeSources.opensky) fetchData();
-      else {
-        for (const m of aircraftMarkers.values()) map.removeLayer(m);
-        aircraftMarkers.clear();
-        for (const t of aircraftTrails.values()) { if(t.line) map.removeLayer(t.line); }
-        aircraftTrails.clear();
-        document.getElementById('status-dot').classList.remove('live');
-        document.getElementById('status-text').textContent = 'متوقف';
-        document.getElementById('status-text').style.color = '#fff';
-      }
-    }
   });
 });
 
@@ -596,7 +575,8 @@ document.getElementById('settings-btn').addEventListener('click', openSettings);
 
 drawCenter();
 fetchData();
-setInterval(fetchData, 5000); 
+setInterval(fetchData, 10000); // تحديث البيانات الحقيقية كل 10 ثواني
+requestAnimationFrame(continuousAnimation); // تشغيل محرك الحركة المستمرة
 </script>
 </body>
 </html>
