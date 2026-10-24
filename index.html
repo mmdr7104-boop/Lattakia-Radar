@@ -165,7 +165,7 @@
   <div class="header-titles">
     <div class="title-right">
       <div class="main-title">مطار اللاذقية الدولي</div>
-      <div class="sub-title">نظام الرادار v3.5</div>
+      <div class="sub-title">نظام الرادار v3.6</div>
     </div>
     <div class="title-left">
       <div class="main-title">حركة الطيران المدني</div>
@@ -238,7 +238,6 @@
 </div>
 
 <script>
-// مفاتيح OpenSky الخاصة بك
 const OPENSKY_CLIENT_ID = "djsiscajfwvaywf@gmail.com-api-client";      
 const OPENSKY_CLIENT_SECRET = "ORFrKlJuG1EKCQ0PTwAHChMCJFu9MyGd";
 
@@ -344,16 +343,26 @@ document.getElementById('toggle-rings-btn').addEventListener('click', () => {
   drawRings();
 });
 
-// ==========================================
-// ** نظام OAuth2 عبر الوسيط (لحل مشكلة CORS) **
-// ==========================================
 let openskyAccessToken = null;
 let tokenExpiryTime = 0;
+
+// إضافة مؤقت إيقاف (Timeout) عشان ما يعلق البرنامج
+async function fetchWithTimeout(url, options, timeout = 3000) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+        const response = await fetch(url, { ...options, signal: controller.signal });
+        clearTimeout(id);
+        return response;
+    } catch (e) {
+        clearTimeout(id);
+        throw e;
+    }
+}
 
 async function getOpenSkyToken() {
     if (openskyAccessToken && Date.now() < tokenExpiryTime) return openskyAccessToken;
 
-    // نمرر رابط تسجيل الدخول عبر الوسيط الخاص بك
     const originalTokenUrl = 'https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token';
     const tokenUrl = `https://radarl.mmdr7104.workers.dev/?url=${encodeURIComponent(originalTokenUrl)}`;
 
@@ -363,16 +372,13 @@ async function getOpenSkyToken() {
     params.append('client_secret', OPENSKY_CLIENT_SECRET);
 
     try {
-        const response = await fetch(tokenUrl, {
+        const response = await fetchWithTimeout(tokenUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: params.toString()
-        });
+        }, 3000); // 3 ثواني مهلة كحد أقصى
 
-        if (!response.ok) {
-            const errData = await response.text();
-            throw new Error(`HTTP ${response.status}: ${errData}`);
-        }
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const data = await response.json();
         openskyAccessToken = data.access_token;
@@ -380,7 +386,7 @@ async function getOpenSkyToken() {
         
         return openskyAccessToken;
     } catch (error) {
-        console.error('خطأ OAuth2:', error);
+        console.warn('فشل تسجيل الدخول لـ OpenSky:', error.message);
         return null;
     }
 }
@@ -455,7 +461,7 @@ async function fetchData() {
     const token = await getOpenSkyToken();
     if (!token) throw new Error('لا يوجد توكن');
 
-    const res = await fetch(apiUrl, { headers: { 'Authorization': `Bearer ${token}` } });
+    const res = await fetchWithTimeout(apiUrl, { headers: { 'Authorization': `Bearer ${token}` } }, 3000);
     
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
@@ -468,7 +474,7 @@ async function fetchData() {
     }));
 
     dot.classList.add('live'); 
-    txt.textContent = 'مباشر - OpenSky (مسجل)'; 
+    txt.textContent = 'مباشر - OpenSky'; 
     txt.style.color = '#00e676';
     
     updateAircraftData(states);
@@ -480,7 +486,7 @@ async function fetchData() {
         const fallbackUrl = `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${Math.round(config.radius * 0.539957)}`;
         const fallbackProxy = `https://radarl.mmdr7104.workers.dev/?url=${encodeURIComponent(fallbackUrl)}&cb=${Date.now()}`;
         
-        const res2 = await fetch(fallbackProxy, { cache: 'no-store' });
+        const res2 = await fetchWithTimeout(fallbackProxy, { cache: 'no-store' }, 3000);
         if (!res2.ok) throw new Error('HTTP ' + res2.status);
         const data2 = await res2.json();
         
