@@ -16,18 +16,47 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a1628; }
   #map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+  
   #topbar { position: absolute; top: 0; left: 0; right: 0; z-index: 1000; background: linear-gradient(180deg, #0a1628 0%, #12253f 100%); color: #fff; padding: 8px 15px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); border-bottom: 2px solid #00e676; }
   .header-titles { display: flex; justify-content: space-between; align-items: flex-start; width: 100%; }
   .title-right { text-align: right; } .title-left { text-align: left; }
   .main-title { font-size: 16px; font-weight: 800; color: #fff; letter-spacing: 0.5px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
   .sub-title { font-size: 11px; color: #00e676; font-family: monospace; font-weight: bold; margin-top: 2px; letter-spacing: 1px; }
   .header-controls { display: flex; justify-content: center; align-items: center; gap: 6px; background: rgba(0,0,0,0.3); padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(0,230,118,0.2); }
+  
   #status { display: flex; align-items: center; gap: 4px; font-size: 10px; margin-right: 5px;}
   #status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff4444; }
   #status-dot.live { background: #00e676; animation: pulse 2s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-  #debug-panel { display: none; position: absolute; top: 110px; left: 10px; z-index: 1000; background: rgba(0,0,0,0.85); color: #00e676; padding: 10px; font-family: monospace; font-size: 12px; border-radius: 5px; border: 1px solid #00e676; direction: ltr; pointer-events: none; box-shadow: 0 0 10px rgba(0,230,118,0.3); line-height: 1.4; }
-  #sources { position: absolute; bottom: 0; left: 0; right: 0; z-index: 1000; background: linear-gradient(135deg, #0a1628 0%, #1a2f4a 100%); border-radius: 16px 16px 0 0; color: #fff; padding: 12px 12px 20px; box-shadow: 0 -4px 20px rgba(0,0,0,0.4); transition: transform 0.3s ease; }
+
+  /* لوحة المصادر الصغيرة عاليسار (خط خفيف + لمبة) */
+  #left-sources {
+      position: absolute; top: 110px; left: 10px; z-index: 1000;
+      background: rgba(0,0,0,0.4); padding: 8px 10px; border-radius: 6px;
+      display: flex; flex-direction: column; gap: 6px; 
+      border: 1px solid rgba(255,255,255,0.08);
+      pointer-events: none;
+  }
+  .source-item {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 10px; color: rgba(255,255,255,0.7); font-family: monospace;
+  }
+  .source-item .dot {
+      width: 6px; height: 6px; border-radius: 50%; background: #555; transition: all 0.3s;
+  }
+  .source-item .dot.active {
+      background: #00e676; box-shadow: 0 0 6px #00e676;
+  }
+
+  #debug-panel { display: none; position: absolute; top: 110px; right: 10px; z-index: 1000; background: rgba(0,0,0,0.85); color: #00e676; padding: 10px; font-family: monospace; font-size: 12px; border-radius: 5px; border: 1px solid #00e676; direction: ltr; pointer-events: none; box-shadow: 0 0 10px rgba(0,230,118,0.3); line-height: 1.4; }
+  
+  /* ** القائمة السفلية (المصادر) ** */
+  #sources {
+    position: absolute; bottom: 0; left: 0; right: 0; z-index: 1000;
+    background: linear-gradient(135deg, #0a1628 0%, #1a2f4a 100%);
+    border-radius: 16px 16px 0 0; color: #fff; padding: 12px 12px 20px;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.4); transition: transform 0.3s ease;
+  }
   #sources.collapsed { transform: translateY(calc(100% - 45px)); }
   #sources-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; cursor: pointer; }
   #sources-header .title { font-size: 13px; font-weight: 600; }
@@ -42,6 +71,7 @@
   .source-btn .dot { width: 8px; height: 8px; border-radius: 50%; background: #555; display: inline-block; transition: all 0.3s; }
   .source-btn.active { background: rgba(0, 230, 118, 0.15); border-color: #00e676; }
   .source-btn.active .dot { background: #00e676; box-shadow: 0 0 8px #00e676; }
+
   .top-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 6px 8px; color: #fff; font-size: 14px; cursor: pointer; font-family: inherit; transition: opacity 0.2s; display: flex; justify-content: center; align-items: center; }
   .top-btn:active { transform: scale(0.95); }
   .top-btn:disabled { opacity: 0.3; cursor: not-allowed; }
@@ -71,11 +101,24 @@
 <div id="map"></div>
 <div id="debug-panel"></div>
 
+<!-- لوحة المصادر الصغيرة عاليسار -->
+<div id="left-sources">
+    <div class="source-item" id="src-adsbfi">
+        <div class="dot"></div> <div>adsb.fi</div>
+    </div>
+    <div class="source-item" id="src-adsblol">
+        <div class="dot"></div> <div>adsb.lol</div>
+    </div>
+    <div class="source-item" id="src-sim">
+        <div class="dot"></div> <div>محاكاة</div>
+    </div>
+</div>
+
 <div id="topbar">
   <div class="header-titles">
     <div class="title-right">
       <div class="main-title">مطار اللاذقية الدولي</div>
-      <div class="sub-title">نظام الرادار v9.0</div>
+      <div class="sub-title">نظام الرادار v9.3</div>
     </div>
     <div class="title-left">
       <div class="main-title">حركة الطيران المدني</div>
@@ -92,6 +135,7 @@
   </div>
 </div>
 
+<!-- القائمة السفلية للأزرار -->
 <div id="sources" class="collapsed">
   <div id="sources-header" onclick="toggleSources()">
     <div style="width:40px;"></div>
@@ -130,7 +174,7 @@
   </div>
 </div>
 
-<div style="position: absolute; bottom: 50px; width: 100%; text-align: center; color: rgba(255,255,255,0.3); font-size: 10px; z-index: 1000; pointer-events: none; font-family: monospace;">
+<div style="position: absolute; bottom: 60px; width: 100%; text-align: center; color: rgba(255,255,255,0.3); font-size: 10px; z-index: 1000; pointer-events: none; font-family: monospace;">
   © 2023 Eng. Modar Hasan - All Rights Reserved
 </div>
 
@@ -281,6 +325,13 @@ function generateDemoData() {
     return demoPlanes;
 }
 
+function updateSourceLights(activeSource) {
+    document.querySelectorAll('#left-sources .dot').forEach(dot => dot.classList.remove('active'));
+    if (activeSource === 'adsb.fi') document.getElementById('src-adsbfi').querySelector('.dot').classList.add('active');
+    else if (activeSource === 'adsb.lol') document.getElementById('src-adsblol').querySelector('.dot').classList.add('active');
+    else if (activeSource === 'demo') document.getElementById('src-sim').querySelector('.dot').classList.add('active');
+}
+
 async function fetchData() {
   if (isFetching) return;
   isFetching = true;
@@ -313,6 +364,7 @@ async function fetchData() {
       }));
 
       isDemoMode = false;
+      updateSourceLights(sources[i].name);
       updateAircraftData(states);
       success = true;
       break;
@@ -325,10 +377,10 @@ async function fetchData() {
     txt.textContent = 'وضع المحاكاة (للعرض)'; 
     txt.style.color = '#ffa726'; 
     
-    // ** التعديل السحري: توليد البيانات مرة وحدة بس، وترك الحركة للمحرك **
     if (!isDemoMode) {
         isDemoMode = true;
         const demoPlanes = generateDemoData();
+        updateSourceLights('demo');
         updateAircraftData(demoPlanes);
     }
   }
@@ -345,14 +397,12 @@ function updateAircraftData(states) {
     seen.add(icao24);
     
     if (!isDemoMode) {
-        // في الوضع الحقيقي، نحدث الإحداثيات كل مرة
         aircraftStates.set(icao24, {
           lat: s.lat, lon: s.lon, velocity: s.velocity_ms, track: s.track,
           onGround: s.alt_baro === 'ground' || s.alt_baro === 0,
           data: s
         });
     } else {
-        // في وضع المحاكاة، لا نحدث الإحداثيات (نترك المحرك يحركها)
         if (!aircraftStates.has(icao24)) {
             aircraftStates.set(icao24, {
               lat: s.lat, lon: s.lon, velocity: s.velocity_ms, track: s.track,
@@ -368,7 +418,7 @@ function updateAircraftData(states) {
     
     if (!lastPoint || (lastPoint[0] !== s.lat || lastPoint[1] !== s.lon)) {
       trailData.points.push([s.lat, s.lon]);
-      if (trailData.points.length > 50) trailData.points.shift(); // زيادة طول المسار شوي
+      if (trailData.points.length > 50) trailData.points.shift();
 
       if (trailData.line) trailData.line.setLatLngs(trailData.points);
       else trailData.line = L.polyline(trailData.points, { color: s.hex.startsWith('demo') ? '#ffa726' : '#00e676', weight: 3, opacity: 0.6, dashArray: '4, 4' }).addTo(map);
@@ -395,7 +445,7 @@ function updateAircraftData(states) {
     } else {
       const m = aircraftMarkers.get(icao24);
       if(!isDemoMode) {
-          m.setLatLng([s.lat, s.lon]); // تحديث الموقع في الوضع الحقيقي
+          m.setLatLng([s.lat, s.lon]);
       }
       m.setIcon(aircraftIcon(s.track, s.alt_baro === 'ground'));
       m.setPopupContent(popupContent(s));
@@ -414,21 +464,16 @@ function updateAircraftData(states) {
   }
 }
 
-// ** المحرك الجديد القاسي (setInterval) - هذا هو الحل **
 setInterval(() => {
-    const dt = 0.1; // كل 100 ملي ثانية
+    const dt = 0.1; 
 
     aircraftStates.forEach((state, icao24) => {
         const marker = aircraftMarkers.get(icao24);
         if (!marker) return;
 
         if (state.velocity > 0 && !state.onGround) {
+            // ** الحركة الحقيقية 100% (بدون مضاعف) **
             let distance = state.velocity * dt; 
-            
-            // تسريع الحركة في وضع المحاكاة لتصبح مرئية جداً
-            if (isDemoMode && icao24.startsWith('demo')) {
-                distance *= 20; 
-            }
 
             const trackRad = state.track * Math.PI / 180;
             const latRad = state.lat * Math.PI / 180;
@@ -440,7 +485,6 @@ setInterval(() => {
             
             marker.setLatLng([state.lat, state.lon]);
 
-            // رسم المسار في وضع المحاكاة عشان يبين الحركة
             if (isDemoMode && icao24.startsWith('demo')) {
                 if (!aircraftTrails.has(icao24)) aircraftTrails.set(icao24, { points: [], line: null });
                 const trailData = aircraftTrails.get(icao24);
@@ -465,7 +509,7 @@ setInterval(() => {
     });
     if (Date.now() - lastPopupUpdate > 500) { lastPopupUpdate = Date.now(); }
 
-}, 100); // يعمل كل 100 مللي ثانية
+}, 100); 
 
 
 document.getElementById('settings-btn').addEventListener('click', () => {
