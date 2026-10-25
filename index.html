@@ -29,7 +29,6 @@
   #status-dot.live { background: #00e676; animation: pulse 2s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
-  /* لوحة المصادر عاليسار */
   #left-sources {
       position: absolute; top: 160px; left: 10px; z-index: 1000;
       background: rgba(0,0,0,0.6); padding: 10px; border-radius: 8px;
@@ -45,7 +44,6 @@
 
   #debug-panel { display: none; position: absolute; top: 110px; right: 10px; z-index: 1000; background: rgba(0,0,0,0.85); color: #00e676; padding: 10px; font-family: monospace; font-size: 12px; border-radius: 5px; border: 1px solid #00e676; direction: ltr; pointer-events: none; box-shadow: 0 0 10px rgba(0,230,118,0.3); line-height: 1.4; }
   
-  /* القائمة السفلية */
   #sources { position: absolute; bottom: 0; left: 0; right: 0; z-index: 1000; background: linear-gradient(135deg, #0a1628 0%, #1a2f4a 100%); border-radius: 16px 16px 0 0; color: #fff; padding: 12px 12px 20px; box-shadow: 0 -4px 20px rgba(0,0,0,0.4); transition: transform 0.3s ease; }
   #sources.collapsed { transform: translateY(calc(100% - 45px)); }
   #sources-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; cursor: pointer; }
@@ -65,7 +63,6 @@
   .top-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 6px 8px; color: #fff; font-size: 14px; cursor: pointer; font-family: inherit; transition: opacity 0.2s; display: flex; justify-content: center; align-items: center; }
   .top-btn:active { transform: scale(0.95); }
   .top-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-  
   #settings-modal { position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; padding: 20px; }
   #settings-modal.show { display: flex; }
   #settings-content { background: #1a2f4a; color: #fff; border-radius: 16px; padding: 20px; width: 100%; max-width: 400px; max-height: 90vh; overflow-y: auto; }
@@ -82,10 +79,7 @@
   .popup-title { font-size: 15px; font-weight: 700; color: #00e676; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); }
   .popup-row { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; }
   .popup-row .label { opacity: 0.6; } .popup-row .value { font-weight: 500; }
-  
-  /* ** أزرار التكبير عاليمين عشان ما تغطي على لوحة المصادر ** */
   .leaflet-control-zoom { margin-top: 80px !important; margin-right: 10px !important; margin-left: auto !important; }
-
   .ring-label-marker { background: transparent; border: none; box-shadow: none; color: #82a5c1; font-size: 11px; font-family: monospace; font-weight: bold; text-shadow: 1px 1px 2px #000, -1px -1px 2px #000; white-space: nowrap; margin-left: 50%; transform: translateX(-50%); }
   .waypoint-label { color: #ffa726; font-size: 10px; font-weight: bold; font-family: monospace; text-shadow: 1px 1px 2px #000; white-space: nowrap; }
 </style>
@@ -106,7 +100,7 @@
   <div class="header-titles">
     <div class="title-right">
       <div class="main-title">مطار اللاذقية الدولي</div>
-      <div class="sub-title">نظام الرادار v13.0</div>
+      <div class="sub-title">نظام الرادار v14.1</div>
     </div>
     <div class="title-left">
       <div class="main-title">حركة الطيران المدني</div>
@@ -167,6 +161,9 @@
 </div>
 
 <script>
+// ** الرابط الجديد لـ Deno Deploy **
+const API_BASE = 'https://wide-crane-2295.mmdr7104-boop.deno.net';
+
 const DEFAULT_CONFIG = { name: 'مطار اللاذقية الدولي', lat: 35.4011, lng: 35.9486, radius: 250, ringInterval: 50, showRings: true, darkMap: false, showAirways: true };
 let config = JSON.parse(localStorage.getItem('radar_config') || 'null') || {...DEFAULT_CONFIG};
 
@@ -255,10 +252,6 @@ refreshBtn.addEventListener('click', () => { fetchData(); });
 function clearCache() { localStorage.clear(); sessionStorage.clear(); window.location.replace(window.location.pathname + '?v=' + Date.now()); }
 
 const aircraftMarkers = new Map();
-const aircraftStates = new Map();
-const aircraftTrails = new Map();
-let selectedAircraftId = null;
-let lastPopupUpdate = 0;
 let isFetching = false;
 let isManualSimulation = false;
 
@@ -306,8 +299,7 @@ function generateDemoData() {
             alt_baro: 30000 + Math.random() * 5000,
             gs: 400 + Math.random() * 100,
             track: Math.random() * 360,
-            squawk: "1234",
-            velocity_ms: (400 + Math.random() * 100) / 1.94384
+            squawk: "1234"
         });
     }
     return demoPlanes;
@@ -326,7 +318,6 @@ function updateSourceLights(mode) {
     }
 }
 
-// ** زر المحاكاة اليدوي **
 const toggleSimBtn = document.getElementById('toggle-sim-btn');
 toggleSimBtn.addEventListener('click', () => {
     isManualSimulation = !isManualSimulation;
@@ -340,9 +331,7 @@ toggleSimBtn.addEventListener('click', () => {
         document.getElementById('status-dot').classList.add('live');
         
         for (const m of aircraftMarkers.values()) map.removeLayer(m);
-        aircraftMarkers.clear(); aircraftStates.clear();
-        for (const t of aircraftTrails.values()) { if(t.line) map.removeLayer(t.line); }
-        aircraftTrails.clear();
+        aircraftMarkers.clear();
 
         updateSourceLights('sim');
         const demoPlanes = generateDemoData();
@@ -352,9 +341,7 @@ toggleSimBtn.addEventListener('click', () => {
         toggleSimBtn.style.color = '#ffa726';
         
         for (const m of aircraftMarkers.values()) map.removeLayer(m);
-        aircraftMarkers.clear(); aircraftStates.clear();
-        for (const t of aircraftTrails.values()) { if(t.line) map.removeLayer(t.line); }
-        aircraftTrails.clear();
+        aircraftMarkers.clear();
         
         fetchData();
     }
@@ -364,223 +351,106 @@ async function fetchData() {
   if (isFetching || isManualSimulation) return;
   isFetching = true;
   
-  const dot = document.getElementById('status-dot'), txt = document.getElementById('status-text');
+  const txt = document.getElementById('status-text');
   txt.textContent = 'جاري...';
   txt.style.color = '#fff';
 
-  const nmRadius = Math.round(config.radius * 0.539957);
-  
-  // ** تم تبديل الترتيب: adsb.lol أولاً، ثم adsb.fi **
-  const sources = [
-    { name: 'adsb.lol', url: `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${nmRadius}` },
-    { name: 'adsb.fi', url: `https://opendata.adsb.fi/api/v2/point/${config.lat}/${config.lng}/${nmRadius}` }
-  ];
+  try {
+    const url = `${API_BASE}/?lat=${config.lat}&lon=${config.lng}&radius=${config.radius}`;
+    const res = await fetch(url, { cache: 'no-store' });
 
-  let success = false;
+    if (!res.ok) throw new Error('HTTP ' + res.status);
 
-  for (let i = 0; i < sources.length; i++) {
-    try {
-      const res = await fetch(sources[i].url, { cache: 'no-store' });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const data = await res.json();
-      
-      dot.classList.add('live'); 
-      txt.textContent = 'مباشر - ' + sources[i].name; 
-      txt.style.color = '#00e676';
-      
-      const states = (data.ac || []).map(s => ({
-        hex: s.hex, flight: s.flight, lat: s.lat, lon: s.lon,
-        alt_baro: s.alt_baro, gs: s.gs, track: s.track, squawk: s.squawk,
-        velocity_ms: (s.gs || 0) / 1.94384
-      }));
+    const data = await res.json();
+    const planes = data.ac || [];
 
+    if (planes.length === 0) {
+      updateSourceLights('fail');
+      txt.textContent = 'لا طائرات';
+      txt.style.color = '#ffa726';
+    } else {
       updateSourceLights('live');
-      updateAircraftData(states, false);
-      success = true;
-      break;
-      
-    } catch (err) { console.warn('فشل المصدر:', sources[i].name); }
-  }
+      txt.textContent = `حي (${planes.length})`;
+      txt.style.color = '#00e676';
+    }
 
-  if (!success) {
-    dot.classList.remove('live'); 
-    txt.textContent = 'فشل الاتصال (حظر مؤقت)'; 
-    txt.style.color = '#ff4444'; 
+    updateAircraftData(planes, false);
+  } catch (err) {
+    console.error('Fetch failed:', err);
     updateSourceLights('fail');
+    txt.textContent = 'خطأ في الاتصال';
+    txt.style.color = '#ff4444';
+  } finally {
+    isFetching = false;
   }
-  
-  isFetching = false;
 }
 
-function updateAircraftData(states, isDemo) {
-  const seen = new Set();
-  
-  for (const s of states) {
-    if (s.lat == null || s.lon == null) continue;
-    const icao24 = s.hex;
-    seen.add(icao24);
-    
-    if (!isDemo) {
-        const state = aircraftStates.get(icao24);
-        if (state) {
-            if (!state.serverLat || !state.serverLon || Math.abs(state.serverLat - s.lat) > 0.0001 || Math.abs(state.serverLon - s.lon) > 0.0001) {
-                state.lat = s.lat; state.lon = s.lon;
-                state.serverLat = s.lat; state.serverLon = s.lon;
-            }
-            state.velocity = s.velocity_ms; state.track = s.track; state.data = s;
-        } else {
-            aircraftStates.set(icao24, {
-              lat: s.lat, lon: s.lon, serverLat: s.lat, serverLon: s.lon,
-              velocity: s.velocity_ms, track: s.track,
-              onGround: s.alt_baro === 'ground' || s.alt_baro === 0, data: s
-            });
-        }
-    } else {
-        if (!aircraftStates.has(icao24)) {
-            aircraftStates.set(icao24, {
-              lat: s.lat, lon: s.lon, velocity: s.velocity_ms, track: s.track,
-              onGround: s.alt_baro === 'ground' || s.alt_baro === 0, data: s
-            });
-        }
-    }
+// دالة تحديث الطائرات على الخريطة
+function updateAircraftData(planes, isDemo) {
+  const currentHexes = new Set();
 
-    if (!aircraftMarkers.has(icao24)) {
-      const icon = aircraftIcon(s.track, s.alt_baro === 'ground');
-      const m = L.marker([s.lat, s.lon], { icon }).bindPopup(popupContent(s)).addTo(map);
-      
-      m.on('click', () => { 
-          selectedAircraftId = icao24; 
-          const state = aircraftStates.get(icao24);
-          const pingTime = new Date().toLocaleTimeString('en-GB'); 
-          document.getElementById('debug-panel').innerText = `TRACKING: ${state.data.flight ? state.data.flight.trim() : icao24}\nPing: ${pingTime}\nLat: ${state.lat.toFixed(5)}\nLon: ${state.lon.toFixed(5)}\nSpd: ${Math.round(state.data.gs * 1.852)} km/h`;
-          document.getElementById('debug-panel').style.display = 'block';
-      });
-      
-      m.on('popupclose', () => {
-          selectedAircraftId = null;
-          document.getElementById('debug-panel').style.display = 'none';
-      });
+  planes.forEach(plane => {
+    if (!plane.lat || !plane.lon) return; 
+    const hex = plane.hex;
+    currentHexes.add(hex);
 
-      aircraftMarkers.set(icao24, m);
+    if (aircraftMarkers.has(hex)) {
+      const marker = aircraftMarkers.get(hex);
+      // حركة سلسة إذا كانت البيانات حقيقية
+      marker.setLatLng([plane.lat, plane.lon]);
+      marker.setIcon(aircraftIcon(plane.track, plane.alt_baro === 'ground'));
+      marker.setPopupContent(popupContent(plane));
     } else {
-      const m = aircraftMarkers.get(icao24);
-      m.setIcon(aircraftIcon(s.track, s.alt_baro === 'ground'));
-      m.setPopupContent(popupContent(s));
+      const marker = L.marker([plane.lat, plane.lon], {
+        icon: aircraftIcon(plane.track, plane.alt_baro === 'ground')
+      }).addTo(map);
+      marker.bindPopup(popupContent(plane));
+      aircraftMarkers.set(hex, marker);
     }
-  }
-  
-  for (const [k, m] of aircraftMarkers.entries()) {
-    if (!seen.has(k)) { 
-      map.removeLayer(m); aircraftMarkers.delete(k); aircraftStates.delete(k);
-      if (aircraftTrails.has(k)) {
-        const trail = aircraftTrails.get(k);
-        if (trail.line) map.removeLayer(trail.line);
-        aircraftTrails.delete(k);
-      }
+  });
+
+  // مسح الطائرات التي اختفت
+  for (const [hex, marker] of aircraftMarkers.entries()) {
+    if (!currentHexes.has(hex)) {
+      map.removeLayer(marker);
+      aircraftMarkers.delete(hex);
     }
   }
 }
 
+// تشغيل الرادار
+drawCenter();
+
+// تحديث تلقائي كل 5 ثوانٍ
 setInterval(() => {
-    const dt = 0.1; 
+  if (!isManualSimulation && !document.hidden) fetchData();
+}, 5000);
 
-    aircraftStates.forEach((state, icao24) => {
-        const marker = aircraftMarkers.get(icao24);
-        if (!marker) return;
+// أول جلب فوري
+fetchData();
 
-        if (state.velocity > 0 && !state.onGround) {
-            let distance = state.velocity * dt; 
-            
-            if (isManualSimulation && icao24.startsWith('demo')) {
-                distance *= 20; 
-            }
-
-            const trackRad = state.track * Math.PI / 180;
-            const latRad = state.lat * Math.PI / 180;
-            const dLat = (distance * Math.cos(trackRad)) / 111320;
-            const dLon = (distance * Math.sin(trackRad)) / (111320 * Math.cos(latRad));
-            
-            state.lat += dLat; state.lon += dLon;
-            marker.setLatLng([state.lat, state.lon]);
-
-            if (!aircraftTrails.has(icao24)) aircraftTrails.set(icao24, { points: [], line: null });
-            const trailData = aircraftTrails.get(icao24);
-            trailData.points.push([state.lat, state.lon]);
-            
-            // عدد النقاط 200 عشان يطول المسار
-            if (trailData.points.length > 200) trailData.points.shift();
-            
-            if (trailData.line) {
-                trailData.line.setLatLngs(trailData.points);
-            } else {
-                trailData.line = L.polyline(trailData.points, { 
-                    color: isManualSimulation ? '#ffa726' : '#00e676', 
-                    weight: 3, opacity: 0.6, dashArray: '4, 4' 
-                }).addTo(map);
-            }
-        }
-        
-        const now = Date.now();
-        if (now - lastPopupUpdate > 500) {
-            if (selectedAircraftId === icao24) {
-                const pingTime = new Date().toLocaleTimeString('en-GB'); 
-                document.getElementById('debug-panel').innerText = `TRACKING: ${state.data.flight ? state.data.flight.trim() : icao24}\nPing: ${pingTime}\nLat: ${state.lat.toFixed(5)}\nLon: ${state.lon.toFixed(5)}\nSpd: ${Math.round(state.data.gs * 1.852)} km/h`;
-                if (marker.isPopupOpen()) {
-                    state.data.lat = state.lat; state.data.lon = state.lon;
-                    marker.setPopupContent(popupContent(state.data));
-                }
-            }
-        }
-    });
-    if (Date.now() - lastPopupUpdate > 500) { lastPopupUpdate = Date.now(); }
-
-}, 100); 
-
-
+// إعدادات
 document.getElementById('settings-btn').addEventListener('click', () => {
-  document.getElementById('input-name').value = config.name;
-  document.getElementById('input-lat').value = config.lat;
-  document.getElementById('input-lng').value = config.lng;
-  document.getElementById('input-radius').value = config.radius;
-  document.getElementById('input-ring-interval').value = config.ringInterval;
   document.getElementById('settings-modal').classList.add('show');
 });
-function closeSettings() { document.getElementById('settings-modal').classList.remove('show'); }
+function closeSettings() {
+  document.getElementById('settings-modal').classList.remove('show');
+}
 function saveSettings() {
   config.name = document.getElementById('input-name').value;
   config.lat = parseFloat(document.getElementById('input-lat').value);
   config.lng = parseFloat(document.getElementById('input-lng').value);
   config.radius = parseFloat(document.getElementById('input-radius').value);
-  let newInterval = parseFloat(document.getElementById('input-ring-interval').value);
-  config.ringInterval = (isNaN(newInterval) || newInterval <= 0) ? 50 : newInterval;
+  config.ringInterval = parseFloat(document.getElementById('input-ring-interval').value);
   localStorage.setItem('radar_config', JSON.stringify(config));
   closeSettings();
-  map.setView([config.lat, config.lng], 9);
+  map.setView([config.lat, config.lng], map.getZoom());
   drawCenter();
   fetchData();
 }
-function toggleSources() { document.getElementById('sources').classList.toggle('collapsed'); }
-
-let stopped = false;
-let timer = null;
-
-async function updateLoop() {
-    if (stopped) return;
-    if (!isManualSimulation) {
-        await fetchData();
-    }
-    if (!stopped) {
-        timer = setTimeout(updateLoop, 10000); 
-    }
+function toggleSources() {
+  document.getElementById('sources').classList.toggle('collapsed');
 }
-
-drawCenter();
-updateLoop();
-
-window.addEventListener('beforeunload', () => {
-    stopped = true;
-    clearTimeout(timer);
-});
 </script>
 </body>
 </html>
