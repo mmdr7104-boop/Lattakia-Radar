@@ -75,7 +75,7 @@
   <div class="header-titles">
     <div class="title-right">
       <div class="main-title">مطار اللاذقية الدولي</div>
-      <div class="sub-title">نظام الرادار v7.0</div>
+      <div class="sub-title">نظام الرادار v8.0</div>
     </div>
     <div class="title-left">
       <div class="main-title">حركة الطيران المدني</div>
@@ -263,7 +263,25 @@ function popupContent(s) {
   `;
 }
 
-// ** محاولة جلب البيانات من adsb.fi و adsb.lol **
+// ** دالة السحر: توليد طائرات وهمية في حال فشل الاتصال **
+function generateDemoData() {
+    const demoPlanes = [];
+    for (let i = 0; i < 15; i++) {
+        demoPlanes.push({
+            hex: "demo" + i,
+            flight: "SIM" + Math.floor(Math.random() * 9000),
+            lat: config.lat + (Math.random() - 0.5) * 3,
+            lon: config.lng + (Math.random() - 0.5) * 3,
+            alt_baro: 30000 + Math.random() * 5000,
+            gs: 400 + Math.random() * 100,
+            track: Math.random() * 360,
+            squawk: "1234",
+            velocity_ms: (400 + Math.random() * 100) / 1.94384
+        });
+    }
+    return demoPlanes;
+}
+
 async function fetchData() {
   if (isFetching) return;
   isFetching = true;
@@ -273,7 +291,6 @@ async function fetchData() {
   txt.style.color = '#fff';
 
   const nmRadius = Math.round(config.radius * 0.539957);
-  
   const sources = [
     { name: 'adsb.fi', url: `https://opendata.adsb.fi/api/v2/point/${config.lat}/${config.lng}/${nmRadius}` },
     { name: 'adsb.lol', url: `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${nmRadius}` }
@@ -307,9 +324,13 @@ async function fetchData() {
   }
 
   if (!success) {
-    dot.classList.remove('live'); 
-    txt.textContent = 'فشل الاتصال'; 
-    txt.style.color = '#ff4444';
+    // إذا فشل كل شي، شغل وضع المحاكاة
+    dot.classList.add('live'); 
+    txt.textContent = 'وضع المحاكاة (للعرض)'; 
+    txt.style.color = '#ffa726'; // لون برتقالي
+    
+    const demoPlanes = generateDemoData();
+    updateAircraftData(demoPlanes);
   }
   
   isFetching = false;
@@ -338,7 +359,7 @@ function updateAircraftData(states) {
       if (trailData.points.length > 30) trailData.points.shift();
 
       if (trailData.line) trailData.line.setLatLngs(trailData.points);
-      else trailData.line = L.polyline(trailData.points, { color: '#00e676', weight: 3, opacity: 0.6, dashArray: '4, 4' }).addTo(map);
+      else trailData.line = L.polyline(trailData.points, { color: s.hex.startsWith('demo') ? '#ffa726' : '#00e676', weight: 3, opacity: 0.6, dashArray: '4, 4' }).addTo(map);
     }
 
     if (!aircraftMarkers.has(icao24)) {
