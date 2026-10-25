@@ -149,7 +149,7 @@
   <div class="header-titles">
     <div class="title-right">
       <div class="main-title">مطار اللاذقية الدولي</div>
-      <div class="sub-title">نظام الرادار v5.1</div>
+      <div class="sub-title">نظام الرادار v6.0</div>
     </div>
     <div class="title-left">
       <div class="main-title">حركة الطيران المدني</div>
@@ -375,7 +375,7 @@ function popupContent(s) {
   `;
 }
 
-// ** التعديل هنا: الاتصال بالسيرفر الخاص بك على Render **
+// ** التعديل الجذري: الاتصال المباشر بـ OpenSky بدون توكن وبدون وسيط **
 async function fetchData() {
   if (isFetching) return;
   isFetching = true;
@@ -384,8 +384,12 @@ async function fetchData() {
   txt.textContent = 'جاري...';
   txt.style.color = '#fff';
 
-  // رابط السيرفر الخاص بك
-  const apiUrl = `https://radar-backend-vs6c.onrender.com/planes?lat=${config.lat}&lng=${config.lng}&radius=${config.radius}`;
+  const lamin = (config.lat - 1.5).toFixed(2);
+  const lamax = (config.lat + 1.5).toFixed(2);
+  const lomin = (config.lng - 1.5).toFixed(2);
+  const lomax = (config.lng + 1.5).toFixed(2);
+
+  const apiUrl = `https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`;
 
   try {
     const res = await fetch(apiUrl, { cache: 'no-store' });
@@ -393,13 +397,14 @@ async function fetchData() {
     const data = await res.json();
 
     dot.classList.add('live'); 
-    txt.textContent = 'مباشر - السيرفر'; 
+    txt.textContent = 'مباشر - OpenSky'; 
     txt.style.color = '#00e676';
     
-    const states = (data.ac || []).map(s => ({
-      hex: s.hex, flight: s.flight, lat: s.lat, lon: s.lon,
-      alt_baro: s.alt_baro, gs: s.gs, track: s.track, squawk: s.squawk,
-      velocity_ms: (s.gs || 0) / 1.94384
+    const states = (data.states || []).map(s => ({
+      hex: s[0], flight: s[1], lon: s[5], lat: s[6],
+      alt_baro: s[7] ? s[7] * 3.28084 : (s[13] ? s[13] * 3.28084 : 0),
+      gs: s[9] ? s[9] * 1.94384 : 0, track: s[10] || 0,
+      squawk: s[14], velocity_ms: s[9] || 0
     }));
 
     updateAircraftData(states);
@@ -542,7 +547,7 @@ async function updateLoop() {
     if (stopped) return;
     await fetchData();
     if (!stopped) {
-        timer = setTimeout(updateLoop, 15000);
+        timer = setTimeout(updateLoop, 15000); // تحديث كل 15 ثانية
     }
 }
 
