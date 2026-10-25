@@ -149,7 +149,7 @@
   <div class="header-titles">
     <div class="title-right">
       <div class="main-title">مطار اللاذقية الدولي</div>
-      <div class="sub-title">نظام الرادار v4.0</div>
+      <div class="sub-title">نظام الرادار v5.1</div>
     </div>
     <div class="title-left">
       <div class="main-title">حركة الطيران المدني</div>
@@ -222,8 +222,6 @@
 </div>
 
 <script>
-const WORKER_URL = "https://radarl.mmdr7104.workers.dev"; // عنوان الـ Worker الخاص بك
-
 const DEFAULT_CONFIG = { name: 'مطار اللاذقية الدولي', lat: 35.4011, lng: 35.9486, radius: 250, ringInterval: 50, showRings: true, darkMap: false, showAirways: true };
 let config = JSON.parse(localStorage.getItem('radar_config') || 'null') || {...DEFAULT_CONFIG};
 
@@ -341,7 +339,7 @@ const aircraftTrails = new Map();
 let selectedAircraftId = null;
 let lastAnimationTime = performance.now();
 let lastPopupUpdate = 0;
-let isFetching = false; // لمنع تداخل الطلبات
+let isFetching = false;
 
 function aircraftIcon(heading, onGround) {
   const color = onGround ? '#ffa726' : '#00e676';
@@ -377,7 +375,7 @@ function popupContent(s) {
   `;
 }
 
-// دالة التحديث الجديدة (تستخدم Worker + فحص حداثة البيانات)
+// ** التعديل هنا: الاتصال بالسيرفر الخاص بك على Render **
 async function fetchData() {
   if (isFetching) return;
   isFetching = true;
@@ -386,38 +384,30 @@ async function fetchData() {
   txt.textContent = 'جاري...';
   txt.style.color = '#fff';
 
-  const workerUrl = `${WORKER_URL}?lat=${config.lat}&lng=${config.lng}&radius=${config.radius}`;
+  // رابط السيرفر الخاص بك
+  const apiUrl = `https://radar-backend-vs6c.onrender.com/planes?lat=${config.lat}&lng=${config.lng}&radius=${config.radius}`;
 
   try {
-    const res = await fetch(workerUrl, { cache: 'no-store' });
+    const res = await fetch(apiUrl, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
 
-    if (!data.success) throw new Error(data.error || 'Worker Error');
-
     dot.classList.add('live'); 
-    txt.textContent = 'مباشر - Worker'; 
+    txt.textContent = 'مباشر - السيرفر'; 
     txt.style.color = '#00e676';
     
-    // فحص البيانات قبل العرض
-    const validStates = (data.states || []).filter(s => {
-      // s[3] هو وقت آخر رصد (time_position)
-      const timePos = s[3];
-      if (!timePos) return false;
-      const age = (Date.now() / 1000) - timePos;
-      return age < 120; // نقبل البيانات اللي عمرها أقل من دقيقتين
-    }).map(s => ({
-      hex: s[0], flight: s[1], lon: s[5], lat: s[6],
-      alt_baro: s[7] ? s[7] * 3.28084 : (s[13] ? s[13] * 3.28084 : 0),
-      gs: s[9] ? s[9] * 1.94384 : 0, track: s[10] || 0,
-      squawk: s[14], velocity_ms: s[9] || 0
+    const states = (data.ac || []).map(s => ({
+      hex: s.hex, flight: s.flight, lat: s.lat, lon: s.lon,
+      alt_baro: s.alt_baro, gs: s.gs, track: s.track, squawk: s.squawk,
+      velocity_ms: (s.gs || 0) / 1.94384
     }));
 
-    updateAircraftData(validStates);
+    updateAircraftData(states);
     
   } catch (err) {
     console.error('Fetch Error:', err);
     dot.classList.remove('live'); 
-    txt.textContent = 'فشل التحديث';
+    txt.textContent = 'فشل الاتصال (جاري المحاولة...)';
     txt.style.color = '#ff4444';
   } finally {
     isFetching = false;
@@ -545,7 +535,6 @@ function saveSettings() {
 }
 function toggleSources() { document.getElementById('sources').classList.toggle('collapsed'); }
 
-// نظام التحديث الذكي (لا يبدأ طلباً جديداً قبل انتهاء السابق)
 let stopped = false;
 let timer = null;
 
@@ -553,16 +542,14 @@ async function updateLoop() {
     if (stopped) return;
     await fetchData();
     if (!stopped) {
-        timer = setTimeout(updateLoop, 15000); // كل 15 ثانية
+        timer = setTimeout(updateLoop, 15000);
     }
 }
 
-// تشغيل أول مرة
 drawCenter();
 updateLoop();
 requestAnimationFrame(continuousAnimation);
 
-// إيقاف التحديث عند إغلاق الصفحة
 window.addEventListener('beforeunload', () => {
     stopped = true;
     clearTimeout(timer);
