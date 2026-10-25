@@ -75,7 +75,7 @@
   <div class="header-titles">
     <div class="title-right">
       <div class="main-title">مطار اللاذقية الدولي</div>
-      <div class="sub-title">نظام الرادار v6.1 (تشخيص)</div>
+      <div class="sub-title">نظام الرادار v6.2</div>
     </div>
     <div class="title-left">
       <div class="main-title">حركة الطيران المدني</div>
@@ -263,7 +263,6 @@ function popupContent(s) {
   `;
 }
 
-// ** دالة التشخيص المحدثة بناءً على طلب صديقك **
 async function fetchData() {
   if (isFetching) return;
   isFetching = true;
@@ -281,18 +280,11 @@ async function fetchData() {
 
   try {
     const res = await fetch(apiUrl, { cache: 'no-store' });
-    
-    // التقاط حالة HTTP إذا كانت ليست 200
-    if (!res.ok) {
-        throw new Error(`HTTP Status: ${res.status}`);
-    }
-    
-    // التقاط الرصيد المتبقي
-    const remaining = res.headers.get('X-Rate-Limit-Remaining');
+    if (!res.ok) throw new Error(`HTTP Status: ${res.status}`);
     
     const data = await res.json();
     dot.classList.add('live'); 
-    txt.textContent = `مباشر - OpenSky (المتبقي: ${remaining || '?'})`; 
+    txt.textContent = 'مباشر - OpenSky'; 
     txt.style.color = '#00e676';
     
     const states = (data.states || []).map(s => ({
@@ -307,23 +299,8 @@ async function fetchData() {
   } catch (err) {
     console.error(err);
     dot.classList.remove('live'); 
-    txt.textContent = 'فشل الاتصال (تشخيص)'; 
+    txt.textContent = 'فشل الاتصال'; 
     txt.style.color = '#ff4444';
-    
-    // عرض الخطأ بوضوح على الشاشة لكي تراه
-    let errorMsg = "خطأ غير معروف";
-    if (err.message.includes('Failed to fetch')) {
-        errorMsg = "مشكلة CORS: المتصفح منع الاتصال بسبب حماية المواقع. (يحتاج وسيط)";
-    } else if (err.message.includes('429')) {
-        errorMsg = "خطأ 429: تم استهلاك حد الطلبات المجاني (400 طلب). انتظر 24 ساعة أو غير شبكتك.";
-    } else if (err.message.includes('401') || err.message.includes('403')) {
-        errorMsg = "خطأ " + err.message + ": محظور من السيرفر.";
-    } else {
-        errorMsg = err.message;
-    }
-    
-    alert("🔍 نتيجة التشخيص:\n\n" + errorMsg + "\n\n(انسخ هذه الرسالة وابعتها لصاحبك).");
-    
   } finally {
     isFetching = false;
   }
@@ -456,7 +433,7 @@ async function updateLoop() {
     if (stopped) return;
     await fetchData();
     if (!stopped) {
-        timer = setTimeout(updateLoop, 300000); // 5 دقائق كما نصح صديقك لتوفير الرصيد
+        timer = setTimeout(updateLoop, 10000); // ** التحديث كل 10 ثواني (سينمائي) **
     }
 }
 
