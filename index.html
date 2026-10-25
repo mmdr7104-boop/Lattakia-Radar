@@ -15,129 +15,55 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a1628; }
-  
   #map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-  
-  #topbar {
-    position: absolute; top: 0; left: 0; right: 0; z-index: 1000;
-    background: linear-gradient(180deg, #0a1628 0%, #12253f 100%);
-    color: #fff; padding: 8px 15px;
-    display: flex; flex-direction: column; gap: 8px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-    border-bottom: 2px solid #00e676;
-  }
-  
+  #topbar { position: absolute; top: 0; left: 0; right: 0; z-index: 1000; background: linear-gradient(180deg, #0a1628 0%, #12253f 100%); color: #fff; padding: 8px 15px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); border-bottom: 2px solid #00e676; }
   .header-titles { display: flex; justify-content: space-between; align-items: flex-start; width: 100%; }
-  .title-right { text-align: right; }
-  .title-left { text-align: left; }
-  
+  .title-right { text-align: right; } .title-left { text-align: left; }
   .main-title { font-size: 16px; font-weight: 800; color: #fff; letter-spacing: 0.5px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
   .sub-title { font-size: 11px; color: #00e676; font-family: monospace; font-weight: bold; margin-top: 2px; letter-spacing: 1px; }
-
-  .header-controls {
-    display: flex; justify-content: center; align-items: center; gap: 6px;
-    background: rgba(0,0,0,0.3); padding: 5px 10px; border-radius: 8px;
-    border: 1px solid rgba(0,230,118,0.2);
-  }
-
+  .header-controls { display: flex; justify-content: center; align-items: center; gap: 6px; background: rgba(0,0,0,0.3); padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(0,230,118,0.2); }
   #status { display: flex; align-items: center; gap: 4px; font-size: 10px; margin-right: 5px;}
   #status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff4444; }
   #status-dot.live { background: #00e676; animation: pulse 2s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-  
-  #debug-panel {
-    display: none; position: absolute; top: 110px; left: 10px; z-index: 1000;
-    background: rgba(0,0,0,0.85); color: #00e676; padding: 10px;
-    font-family: monospace; font-size: 12px; border-radius: 5px;
-    border: 1px solid #00e676; direction: ltr; pointer-events: none;
-    box-shadow: 0 0 10px rgba(0,230,118,0.3); line-height: 1.4;
-  }
-  
-  #sources {
-    position: absolute; bottom: 0; left: 0; right: 0; z-index: 1000;
-    background: linear-gradient(135deg, #0a1628 0%, #1a2f4a 100%);
-    border-radius: 16px 16px 0 0; color: #fff; padding: 12px 12px 20px;
-    box-shadow: 0 -4px 20px rgba(0,0,0,0.4); transition: transform 0.3s ease;
-  }
+  #debug-panel { display: none; position: absolute; top: 110px; left: 10px; z-index: 1000; background: rgba(0,0,0,0.85); color: #00e676; padding: 10px; font-family: monospace; font-size: 12px; border-radius: 5px; border: 1px solid #00e676; direction: ltr; pointer-events: none; box-shadow: 0 0 10px rgba(0,230,118,0.3); line-height: 1.4; }
+  #sources { position: absolute; bottom: 0; left: 0; right: 0; z-index: 1000; background: linear-gradient(135deg, #0a1628 0%, #1a2f4a 100%); border-radius: 16px 16px 0 0; color: #fff; padding: 12px 12px 20px; box-shadow: 0 -4px 20px rgba(0,0,0,0.4); transition: transform 0.3s ease; }
   #sources.collapsed { transform: translateY(calc(100% - 45px)); }
   #sources-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; cursor: pointer; }
   #sources-header .title { font-size: 13px; font-weight: 600; }
   #toggle-collapse { font-size: 18px; transition: transform 0.3s; }
   #sources.collapsed #toggle-collapse { transform: rotate(180deg); }
-  
   #source-grid { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; max-height: 40vh; overflow-y: auto; }
-  
-  .source-btn {
-    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 10px; padding: 12px 15px; color: #fff; font-size: 13px;
-    display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 10px;
-    cursor: pointer; transition: all 0.2s; font-family: inherit; width: 100%;
-  }
-  
+  .source-btn { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 12px 15px; color: #fff; font-size: 13px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; transition: all 0.2s; font-family: inherit; width: 100%; }
   .source-btn:active { transform: scale(0.97); }
   .source-btn .icon { font-size: 20px; }
   .source-btn .btn-text { flex: 1; text-align: right; font-weight: 500; }
   .source-btn .status { display: flex; justify-content: center; align-items: center; height: 10px; width: 20px; }
   .source-btn .dot { width: 8px; height: 8px; border-radius: 50%; background: #555; display: inline-block; transition: all 0.3s; }
-  
   .source-btn.active { background: rgba(0, 230, 118, 0.15); border-color: #00e676; }
   .source-btn.active .dot { background: #00e676; box-shadow: 0 0 8px #00e676; }
-  
-  .top-btn {
-    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
-    border-radius: 6px; padding: 6px 8px; color: #fff; font-size: 14px;
-    cursor: pointer; font-family: inherit; transition: opacity 0.2s;
-    display: flex; justify-content: center; align-items: center;
-  }
+  .top-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 6px 8px; color: #fff; font-size: 14px; cursor: pointer; font-family: inherit; transition: opacity 0.2s; display: flex; justify-content: center; align-items: center; }
   .top-btn:active { transform: scale(0.95); }
   .top-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-  
-  #settings-modal {
-    position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,0.7);
-    display: none; align-items: center; justify-content: center; padding: 20px;
-  }
+  #settings-modal { position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; padding: 20px; }
   #settings-modal.show { display: flex; }
-  #settings-content {
-    background: #1a2f4a; color: #fff; border-radius: 16px;
-    padding: 20px; width: 100%; max-width: 400px; max-height: 90vh; overflow-y: auto;
-  }
+  #settings-content { background: #1a2f4a; color: #fff; border-radius: 16px; padding: 20px; width: 100%; max-width: 400px; max-height: 90vh; overflow-y: auto; }
   #settings-content h2 { font-size: 16px; margin-bottom: 5px; text-align: center;}
-  
   .dev-name { text-align: center; font-size: 15px; font-weight: bold; color: #00e676; margin-bottom: 2px; font-family: monospace; }
   .dev-date { text-align: center; font-size: 12px; color: #aaa; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; }
-  
   #settings-content label { font-size: 12px; display: block; margin-bottom: 4px; opacity: 0.8; margin-top: 10px;}
-  #settings-content input {
-    width: 100%; padding: 10px; border-radius: 8px;
-    border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05);
-    color: #fff; margin-bottom: 12px; font-size: 14px; font-family: inherit;
-  }
+  #settings-content input { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: #fff; margin-bottom: 12px; font-size: 14px; font-family: inherit; }
   .modal-buttons { display: flex; gap: 8px; margin-top: 10px; }
   .modal-buttons button { flex: 1; padding: 12px; border-radius: 8px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
-  .btn-primary { background: #00e676; color: #0a1628; }
-  .btn-secondary { background: rgba(255,255,255,0.1); color: #fff; }
-  .btn-danger { background: #ff4444; color: #fff; margin-top: 15px; width: 100%; font-size: 12px;}
-  
+  .btn-primary { background: #00e676; color: #0a1628; } .btn-secondary { background: rgba(255,255,255,0.1); color: #fff; } .btn-danger { background: #ff4444; color: #fff; margin-top: 15px; width: 100%; font-size: 12px;}
   .leaflet-popup-content-wrapper { background: #0a1628; color: #fff; border-radius: 12px; font-family: inherit; }
-  .leaflet-popup-tip { background: #0a1628; }
-  .leaflet-popup-content { margin: 12px; }
+  .leaflet-popup-tip { background: #0a1628; } .leaflet-popup-content { margin: 12px; }
   .popup-title { font-size: 15px; font-weight: 700; color: #00e676; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); }
   .popup-row { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; }
-  .popup-row .label { opacity: 0.6; }
-  .popup-row .value { font-weight: 500; }
+  .popup-row .label { opacity: 0.6; } .popup-row .value { font-weight: 500; }
   .leaflet-control-zoom { margin-top: 120px !important; }
-  
-  .ring-label-marker {
-    background: transparent; border: none; box-shadow: none;
-    color: #82a5c1; font-size: 11px; font-family: monospace; font-weight: bold;
-    text-shadow: 1px 1px 2px #000, -1px -1px 2px #000;
-    white-space: nowrap; margin-left: 50%; transform: translateX(-50%);
-  }
-  
-  .waypoint-label {
-    color: #ffa726; font-size: 10px; font-weight: bold; font-family: monospace;
-    text-shadow: 1px 1px 2px #000; white-space: nowrap;
-  }
+  .ring-label-marker { background: transparent; border: none; box-shadow: none; color: #82a5c1; font-size: 11px; font-family: monospace; font-weight: bold; text-shadow: 1px 1px 2px #000, -1px -1px 2px #000; white-space: nowrap; margin-left: 50%; transform: translateX(-50%); }
+  .waypoint-label { color: #ffa726; font-size: 10px; font-weight: bold; font-family: monospace; text-shadow: 1px 1px 2px #000; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -149,14 +75,13 @@
   <div class="header-titles">
     <div class="title-right">
       <div class="main-title">مطار اللاذقية الدولي</div>
-      <div class="sub-title">نظام الرادار v6.0</div>
+      <div class="sub-title">نظام الرادار v6.1 (تشخيص)</div>
     </div>
     <div class="title-left">
       <div class="main-title">حركة الطيران المدني</div>
       <div class="sub-title">العام 2023</div>
     </div>
   </div>
-  
   <div class="header-controls">
     <div id="status"><div id="status-dot"></div><span id="status-text">جاري...</span></div>
     <button class="top-btn" id="refresh-btn" title="تحديث البيانات">🔄</button>
@@ -174,21 +99,11 @@
     <div id="toggle-collapse">▼</div>
   </div>
   <div id="source-grid">
-    <button class="source-btn placeholder" data-source="atc">
-      <div class="icon">📡</div><div class="btn-text">محطة الرادار الدولية مطار اللاذقية</div><div class="status"><span class="dot"></span></div>
-    </button>
-    <button class="source-btn placeholder" data-source="ploto">
-      <div class="icon">🛰️</div><div class="btn-text">معلومات بلوتو PA4</div><div class="status"><span class="dot"></span></div>
-    </button>
-    <button class="source-btn placeholder" data-source="near">
-      <div class="icon">📶</div><div class="btn-text">Near Radar</div><div class="status"><span class="dot"></span></div>
-    </button>
-    <button class="source-btn placeholder" data-source="ads">
-      <div class="icon">✈️</div><div class="btn-text">مصدر ADS-B</div><div class="status"><span class="dot"></span></div>
-    </button>
-    <button class="source-btn active" data-source="opensky">
-      <div class="icon">🌐</div><div class="btn-text">بيانات الشبكة</div><div class="status"><span class="dot"></span></div>
-    </button>
+    <button class="source-btn placeholder" data-source="atc"><div class="icon">📡</div><div class="btn-text">محطة الرادار الدولية مطار اللاذقية</div><div class="status"><span class="dot"></span></div></button>
+    <button class="source-btn placeholder" data-source="ploto"><div class="icon">🛰️</div><div class="btn-text">معلومات بلوتو PA4</div><div class="status"><span class="dot"></span></div></button>
+    <button class="source-btn placeholder" data-source="near"><div class="icon">📶</div><div class="btn-text">Near Radar</div><div class="status"><span class="dot"></span></div></button>
+    <button class="source-btn placeholder" data-source="ads"><div class="icon">✈️</div><div class="btn-text">مصدر ADS-B</div><div class="status"><span class="dot"></span></div></button>
+    <button class="source-btn active" data-source="opensky"><div class="icon">🌐</div><div class="btn-text">بيانات الشبكة</div><div class="status"><span class="dot"></span></div></button>
   </div>
 </div>
 
@@ -197,7 +112,6 @@
     <h2>⚙️ إعدادات مركز السمت</h2>
     <div class="dev-name">Eng.Modar Hasan</div>
     <div class="dev-date">5/10/2023</div>
-
     <label>اسم الموقع</label>
     <input type="text" id="input-name" value="مطار اللاذقية الدولي">
     <label>خط العرض (Latitude)</label>
@@ -208,7 +122,6 @@
     <input type="number" id="input-radius" step="10" value="250">
     <label>المسافة بين الدوائر (كم)</label>
     <input type="number" id="input-ring-interval" step="10" value="50">
-    
     <div class="modal-buttons">
       <button class="btn-secondary" onclick="closeSettings()">إلغاء</button>
       <button class="btn-primary" onclick="saveSettings()">حفظ</button>
@@ -238,10 +151,7 @@ const airwaysData = [
   { name: "UP60", coords: [[36.5, 32.0], [36.0, 34.0], [35.4, 35.9], [35.2, 36.5], [35.0, 38.0]], color: "#ab47bc" }
 ];
 const waypoints = [
-  { name: "LATAKIA", lat: 35.4011, lng: 35.9486 },
-  { name: "BEIRUT", lat: 33.8208, lng: 35.4883 },
-  { name: "CYPRUS", lat: 35.0000, lng: 33.0000 },
-  { name: "ALEPPO", lat: 36.1800, lng: 37.2200 }
+  { name: "LATAKIA", lat: 35.4011, lng: 35.9486 }, { name: "BEIRUT", lat: 33.8208, lng: 35.4883 }, { name: "CYPRUS", lat: 35.0000, lng: 33.0000 }, { name: "ALEPPO", lat: 36.1800, lng: 37.2200 }
 ];
 
 function drawAirways() {
@@ -271,16 +181,7 @@ let centerMarker = null, rangeCircle = null, rangeRings = [];
 function drawCenter() {
   if (centerMarker) map.removeLayer(centerMarker);
   if (rangeCircle) map.removeLayer(rangeCircle);
-  
-  const svg = `<svg width="30" height="30" viewBox="0 0 30 30">
-    <circle cx="15" cy="15" r="12" fill="none" stroke="#00e676" stroke-width="1.5" opacity="0.4"/>
-    <circle cx="15" cy="15" r="6" fill="none" stroke="#00e676" stroke-width="1.5" opacity="0.7"/>
-    <circle cx="15" cy="15" r="3" fill="#00e676"/>
-    <line x1="15" y1="0" x2="15" y2="8" stroke="#00e676" stroke-width="1.5"/>
-    <line x1="15" y1="22" x2="15" y2="30" stroke="#00e676" stroke-width="1.5"/>
-    <line x1="0" y1="15" x2="8" y2="15" stroke="#00e676" stroke-width="1.5"/>
-    <line x1="22" y1="15" x2="30" y2="15" stroke="#00e676" stroke-width="1.5"/>
-  </svg>`;
+  const svg = `<svg width="30" height="30" viewBox="0 0 30 30"><circle cx="15" cy="15" r="12" fill="none" stroke="#00e676" stroke-width="1.5" opacity="0.4"/><circle cx="15" cy="15" r="6" fill="none" stroke="#00e676" stroke-width="1.5" opacity="0.7"/><circle cx="15" cy="15" r="3" fill="#00e676"/><line x1="15" y1="0" x2="15" y2="8" stroke="#00e676" stroke-width="1.5"/><line x1="15" y1="22" x2="15" y2="30" stroke="#00e676" stroke-width="1.5"/><line x1="0" y1="15" x2="8" y2="15" stroke="#00e676" stroke-width="1.5"/><line x1="22" y1="15" x2="30" y2="15" stroke="#00e676" stroke-width="1.5"/></svg>`;
   centerMarker = L.marker([config.lat, config.lng], { icon: L.divIcon({ html: svg, className: '', iconSize: [30,30], iconAnchor: [15,15] }) }).addTo(map);
   rangeCircle = L.circle([config.lat, config.lng], { radius: config.radius * 1000, color: '#00e676', weight: 1, opacity: 0.3, fillColor: '#00e676', fillOpacity: 0.03, dashArray: '5, 10' }).addTo(map);
   drawRings();
@@ -288,10 +189,8 @@ function drawCenter() {
 }
 
 function drawRings() {
-  rangeRings.forEach(r => map.removeLayer(r));
-  rangeRings = [];
+  rangeRings.forEach(r => map.removeLayer(r)); rangeRings = [];
   if (!config.showRings || config.ringInterval <= 0) return;
-
   for (let d = config.ringInterval; d < config.radius; d += config.ringInterval) {
     const circle = L.circle([config.lat, config.lng], { radius: d * 1000, color: '#4a7c9d', weight: 1, opacity: 0.5, fill: false, dashArray: '3, 6' }).addTo(map);
     rangeRings.push(circle);
@@ -301,7 +200,6 @@ function drawRings() {
   }
   if (centerMarker) centerMarker.bringToFront();
 }
-
 if (!config.showRings) { document.getElementById('toggle-rings-btn').style.opacity = '0.4'; }
 
 document.getElementById('toggle-map-btn').addEventListener('click', () => {
@@ -320,18 +218,9 @@ document.getElementById('toggle-rings-btn').addEventListener('click', () => {
 });
 
 const refreshBtn = document.getElementById('refresh-btn');
-refreshBtn.addEventListener('click', () => {
-  fetchData();
-  refreshBtn.disabled = true;
-  refreshBtn.style.opacity = '0.3';
-  setTimeout(() => { refreshBtn.disabled = false; refreshBtn.style.opacity = '1'; }, 3000);
-});
+refreshBtn.addEventListener('click', () => { fetchData(); });
 
-function clearCache() {
-  localStorage.clear();
-  sessionStorage.clear();
-  window.location.replace(window.location.pathname + '?v=' + Date.now());
-}
+function clearCache() { localStorage.clear(); sessionStorage.clear(); window.location.replace(window.location.pathname + '?v=' + Date.now()); }
 
 const aircraftMarkers = new Map();
 const aircraftStates = new Map();
@@ -344,8 +233,7 @@ let isFetching = false;
 function aircraftIcon(heading, onGround) {
   const color = onGround ? '#ffa726' : '#00e676';
   return L.divIcon({
-    html: `<svg width="30" height="30" viewBox="0 0 24 24" style="transform: rotate(${heading||0}deg); filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.6));">
-      <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" fill="${color}" stroke="#0a1628" stroke-width="1"/></svg>`,
+    html: `<svg width="30" height="30" viewBox="0 0 24 24" style="transform: rotate(${heading||0}deg); filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.6));"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" fill="${color}" stroke="#0a1628" stroke-width="1"/></svg>`,
     className: '', iconSize: [30,30], iconAnchor: [15,15]
   });
 }
@@ -375,7 +263,7 @@ function popupContent(s) {
   `;
 }
 
-// ** التعديل الجذري: الاتصال المباشر بـ OpenSky بدون توكن وبدون وسيط **
+// ** دالة التشخيص المحدثة بناءً على طلب صديقك **
 async function fetchData() {
   if (isFetching) return;
   isFetching = true;
@@ -393,11 +281,18 @@ async function fetchData() {
 
   try {
     const res = await fetch(apiUrl, { cache: 'no-store' });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    
+    // التقاط حالة HTTP إذا كانت ليست 200
+    if (!res.ok) {
+        throw new Error(`HTTP Status: ${res.status}`);
+    }
+    
+    // التقاط الرصيد المتبقي
+    const remaining = res.headers.get('X-Rate-Limit-Remaining');
+    
     const data = await res.json();
-
     dot.classList.add('live'); 
-    txt.textContent = 'مباشر - OpenSky'; 
+    txt.textContent = `مباشر - OpenSky (المتبقي: ${remaining || '?'})`; 
     txt.style.color = '#00e676';
     
     const states = (data.states || []).map(s => ({
@@ -410,10 +305,25 @@ async function fetchData() {
     updateAircraftData(states);
     
   } catch (err) {
-    console.error('Fetch Error:', err);
+    console.error(err);
     dot.classList.remove('live'); 
-    txt.textContent = 'فشل الاتصال (جاري المحاولة...)';
+    txt.textContent = 'فشل الاتصال (تشخيص)'; 
     txt.style.color = '#ff4444';
+    
+    // عرض الخطأ بوضوح على الشاشة لكي تراه
+    let errorMsg = "خطأ غير معروف";
+    if (err.message.includes('Failed to fetch')) {
+        errorMsg = "مشكلة CORS: المتصفح منع الاتصال بسبب حماية المواقع. (يحتاج وسيط)";
+    } else if (err.message.includes('429')) {
+        errorMsg = "خطأ 429: تم استهلاك حد الطلبات المجاني (400 طلب). انتظر 24 ساعة أو غير شبكتك.";
+    } else if (err.message.includes('401') || err.message.includes('403')) {
+        errorMsg = "خطأ " + err.message + ": محظور من السيرفر.";
+    } else {
+        errorMsg = err.message;
+    }
+    
+    alert("🔍 نتيجة التشخيص:\n\n" + errorMsg + "\n\n(انسخ هذه الرسالة وابعتها لصاحبك).");
+    
   } finally {
     isFetching = false;
   }
@@ -511,7 +421,6 @@ function continuousAnimation(currentTime) {
             }
         }
     });
-
     if (currentTime - lastPopupUpdate > 500) { lastPopupUpdate = currentTime; }
     requestAnimationFrame(continuousAnimation);
 }
@@ -547,7 +456,7 @@ async function updateLoop() {
     if (stopped) return;
     await fetchData();
     if (!stopped) {
-        timer = setTimeout(updateLoop, 15000); // تحديث كل 15 ثانية
+        timer = setTimeout(updateLoop, 300000); // 5 دقائق كما نصح صديقك لتوفير الرصيد
     }
 }
 
