@@ -30,15 +30,17 @@
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
   #left-sources {
-      position: absolute; top: 110px; left: 10px; z-index: 1000;
-      background: rgba(0,0,0,0.4); padding: 8px 10px; border-radius: 6px;
-      display: flex; flex-direction: column; gap: 6px; 
-      border: 1px solid rgba(255,255,255,0.08);
+      position: absolute; top: 160px; left: 10px; z-index: 1000;
+      background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px;
+      display: flex; flex-direction: column; gap: 8px; 
+      border: 1px solid rgba(255,255,255,0.1);
       pointer-events: none;
   }
-  .source-item { display: flex; align-items: center; gap: 6px; font-size: 10px; color: rgba(255,255,255,0.7); font-family: monospace; }
-  .source-item .dot { width: 6px; height: 6px; border-radius: 50%; background: #555; transition: all 0.3s; }
-  .source-item .dot.active { background: #00e676; box-shadow: 0 0 6px #00e676; }
+  .source-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgba(255,255,255,0.8); font-family: monospace; }
+  .source-item .dot { width: 8px; height: 8px; border-radius: 50%; background: #555; transition: all 0.3s; }
+  .source-item .dot.active { background: #00e676; box-shadow: 0 0 8px #00e676; }
+  .source-item .dot.sim { background: #ffa726; box-shadow: 0 0 8px #ffa726; }
+  .source-item .dot.fail { background: #ff4444; box-shadow: 0 0 8px #ff4444; }
 
   #debug-panel { display: none; position: absolute; top: 110px; right: 10px; z-index: 1000; background: rgba(0,0,0,0.85); color: #00e676; padding: 10px; font-family: monospace; font-size: 12px; border-radius: 5px; border: 1px solid #00e676; direction: ltr; pointer-events: none; box-shadow: 0 0 10px rgba(0,230,118,0.3); line-height: 1.4; }
   
@@ -77,7 +79,7 @@
   .popup-title { font-size: 15px; font-weight: 700; color: #00e676; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); }
   .popup-row { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; }
   .popup-row .label { opacity: 0.6; } .popup-row .value { font-weight: 500; }
-  .leaflet-control-zoom { margin-top: 120px !important; }
+  .leaflet-control-zoom { margin-top: 80px !important; margin-left: 10px !important; margin-right: auto !important; }
   .ring-label-marker { background: transparent; border: none; box-shadow: none; color: #82a5c1; font-size: 11px; font-family: monospace; font-weight: bold; text-shadow: 1px 1px 2px #000, -1px -1px 2px #000; white-space: nowrap; margin-left: 50%; transform: translateX(-50%); }
   .waypoint-label { color: #ffa726; font-size: 10px; font-weight: bold; font-family: monospace; text-shadow: 1px 1px 2px #000; white-space: nowrap; }
 </style>
@@ -88,16 +90,17 @@
 <div id="debug-panel"></div>
 
 <div id="left-sources">
-    <div class="source-item" id="src-adsbfi"><div class="dot"></div> <div>adsb.fi</div></div>
-    <div class="source-item" id="src-adsblol"><div class="dot"></div> <div>adsb.lol</div></div>
-    <div class="source-item" id="src-sim"><div class="dot"></div> <div>محاكاة</div></div>
+    <div class="source-item" id="src-atc"><div class="dot"></div> <div>محطة الرادار الدولية (ATC)</div></div>
+    <div class="source-item" id="src-ploto"><div class="dot"></div> <div>معلومات بلوتو (PLOTO)</div></div>
+    <div class="source-item" id="src-near"><div class="dot"></div> <div>Near Radar</div></div>
+    <div class="source-item" id="src-internet"><div class="dot"></div> <div>بيانات الشبكة</div></div>
 </div>
 
 <div id="topbar">
   <div class="header-titles">
     <div class="title-right">
       <div class="main-title">مطار اللاذقية الدولي</div>
-      <div class="sub-title">نظام الرادار v10.1</div>
+      <div class="sub-title">نظام الرادار v12.2</div>
     </div>
     <div class="title-left">
       <div class="main-title">حركة الطيران المدني</div>
@@ -106,6 +109,7 @@
   </div>
   <div class="header-controls">
     <div id="status"><div id="status-dot"></div><span id="status-text">جاري...</span></div>
+    <button class="top-btn" id="toggle-sim-btn" style="color: #ffa726; border-color: #ffa726;" title="تفعيل/إيقاف المحاكاة">🎬 محاكاة</button>
     <button class="top-btn" id="refresh-btn" title="تحديث البيانات">🔄</button>
     <button class="top-btn" id="toggle-map-btn" title="تبديل الخريطة">🌍</button>
     <button class="top-btn" id="toggle-rings-btn" title="الدوائر">🎯</button>
@@ -250,7 +254,7 @@ const aircraftTrails = new Map();
 let selectedAircraftId = null;
 let lastPopupUpdate = 0;
 let isFetching = false;
-let isDemoMode = false;
+let isManualSimulation = false;
 
 function aircraftIcon(heading, onGround) {
   const color = onGround ? '#ffa726' : '#00e676';
@@ -303,19 +307,60 @@ function generateDemoData() {
     return demoPlanes;
 }
 
-function updateSourceLights(activeSource) {
-    document.querySelectorAll('#left-sources .dot').forEach(dot => dot.classList.remove('active'));
-    if (activeSource === 'adsb.fi') document.getElementById('src-adsbfi').querySelector('.dot').classList.add('active');
-    else if (activeSource === 'adsb.lol') document.getElementById('src-adsblol').querySelector('.dot').classList.add('active');
-    else if (activeSource === 'demo') document.getElementById('src-sim').querySelector('.dot').classList.add('active');
+function updateSourceLights(mode) {
+    document.querySelectorAll('#left-sources .dot').forEach(dot => {
+        dot.classList.remove('active', 'sim', 'fail');
+    });
+    if (mode === 'live') {
+        document.getElementById('src-internet').querySelector('.dot').classList.add('active');
+    } else if (mode === 'sim') {
+        document.getElementById('src-internet').querySelector('.dot').classList.add('sim');
+    } else if (mode === 'fail') {
+        document.getElementById('src-internet').querySelector('.dot').classList.add('fail');
+    }
 }
 
+// ** زر المحاكاة اليدوي **
+const toggleSimBtn = document.getElementById('toggle-sim-btn');
+toggleSimBtn.addEventListener('click', () => {
+    isManualSimulation = !isManualSimulation;
+    const statusTxt = document.getElementById('status-text');
+    
+    if (isManualSimulation) {
+        toggleSimBtn.style.background = '#ffa726';
+        toggleSimBtn.style.color = '#0a1628';
+        statusTxt.textContent = 'وضع المحاكاة (يدوي)';
+        statusTxt.style.color = '#ffa726';
+        document.getElementById('status-dot').classList.add('live');
+        
+        for (const m of aircraftMarkers.values()) map.removeLayer(m);
+        aircraftMarkers.clear(); aircraftStates.clear();
+        for (const t of aircraftTrails.values()) { if(t.line) map.removeLayer(t.line); }
+        aircraftTrails.clear();
+
+        updateSourceLights('sim');
+        const demoPlanes = generateDemoData();
+        updateAircraftData(demoPlanes, true);
+    } else {
+        toggleSimBtn.style.background = 'rgba(255,255,255,0.1)';
+        toggleSimBtn.style.color = '#ffa726';
+        
+        for (const m of aircraftMarkers.values()) map.removeLayer(m);
+        aircraftMarkers.clear(); aircraftStates.clear();
+        for (const t of aircraftTrails.values()) { if(t.line) map.removeLayer(t.line); }
+        aircraftTrails.clear();
+        
+        fetchData();
+    }
+});
+
 async function fetchData() {
-  if (isFetching) return;
+  if (isFetching || isManualSimulation) return;
   isFetching = true;
   
   const dot = document.getElementById('status-dot'), txt = document.getElementById('status-text');
-  if (!isDemoMode) { txt.textContent = 'جاري...'; txt.style.color = '#fff'; }
+  txt.textContent = 'جاري...';
+  txt.style.color = '#fff';
 
   const nmRadius = Math.round(config.radius * 0.539957);
   const sources = [
@@ -341,9 +386,8 @@ async function fetchData() {
         velocity_ms: (s.gs || 0) / 1.94384
       }));
 
-      isDemoMode = false;
-      updateSourceLights(sources[i].name);
-      updateAircraftData(states);
+      updateSourceLights('live');
+      updateAircraftData(states, false);
       success = true;
       break;
       
@@ -351,22 +395,16 @@ async function fetchData() {
   }
 
   if (!success) {
-    dot.classList.add('live'); 
-    txt.textContent = 'وضع المحاكاة (للعرض)'; 
-    txt.style.color = '#ffa726'; 
-    
-    if (!isDemoMode) {
-        isDemoMode = true;
-        const demoPlanes = generateDemoData();
-        updateSourceLights('demo');
-        updateAircraftData(demoPlanes);
-    }
+    dot.classList.remove('live'); 
+    txt.textContent = 'فشل الاتصال (حظر مؤقت)'; 
+    txt.style.color = '#ff4444'; 
+    updateSourceLights('fail');
   }
   
   isFetching = false;
 }
 
-function updateAircraftData(states) {
+function updateAircraftData(states, isDemo) {
   const seen = new Set();
   
   for (const s of states) {
@@ -374,20 +412,14 @@ function updateAircraftData(states) {
     const icao24 = s.hex;
     seen.add(icao24);
     
-    if (!isDemoMode) {
+    if (!isDemo) {
         const state = aircraftStates.get(icao24);
         if (state) {
-            // ** منع الارتداد (Anti-Snapping) **
-            // إذا تغير مكان السيرفر عن آخر مكان سجله، نحدث المكان
             if (!state.serverLat || !state.serverLon || Math.abs(state.serverLat - s.lat) > 0.0001 || Math.abs(state.serverLon - s.lon) > 0.0001) {
-                state.lat = s.lat; 
-                state.lon = s.lon;
-                state.serverLat = s.lat;
-                state.serverLon = s.lon;
+                state.lat = s.lat; state.lon = s.lon;
+                state.serverLat = s.lat; state.serverLon = s.lon;
             }
-            state.velocity = s.velocity_ms;
-            state.track = s.track;
-            state.data = s;
+            state.velocity = s.velocity_ms; state.track = s.track; state.data = s;
         } else {
             aircraftStates.set(icao24, {
               lat: s.lat, lon: s.lon, serverLat: s.lat, serverLon: s.lon,
@@ -451,9 +483,9 @@ setInterval(() => {
         if (state.velocity > 0 && !state.onGround) {
             let distance = state.velocity * dt; 
             
-            // ** تسريع الحركة في وضع المحاكاة لتصبح مرئية جداً **
-            if (isDemoMode && icao24.startsWith('demo')) {
-                distance *= 4; 
+            // ** زيادة مضاعف السرعة في المحاكاة عشان المسار يبان **
+            if (isManualSimulation && icao24.startsWith('demo')) {
+                distance *= 20; 
             }
 
             const trackRad = state.track * Math.PI / 180;
@@ -461,22 +493,21 @@ setInterval(() => {
             const dLat = (distance * Math.cos(trackRad)) / 111320;
             const dLon = (distance * Math.sin(trackRad)) / (111320 * Math.cos(latRad));
             
-            state.lat += dLat; 
-            state.lon += dLon;
-            
+            state.lat += dLat; state.lon += dLon;
             marker.setLatLng([state.lat, state.lon]);
 
-            // ** رسم المسار المستمر لكل الطيارات (حقيقية ومحاكاة) **
             if (!aircraftTrails.has(icao24)) aircraftTrails.set(icao24, { points: [], line: null });
             const trailData = aircraftTrails.get(icao24);
             trailData.points.push([state.lat, state.lon]);
-            if (trailData.points.length > 50) trailData.points.shift();
+            
+            // ** زيادة عدد النقاط إلى 200 عشان يطول المسار وتبين الحركة بوضوح **
+            if (trailData.points.length > 200) trailData.points.shift();
             
             if (trailData.line) {
                 trailData.line.setLatLngs(trailData.points);
             } else {
                 trailData.line = L.polyline(trailData.points, { 
-                    color: isDemoMode ? '#ffa726' : '#00e676', 
+                    color: isManualSimulation ? '#ffa726' : '#00e676', 
                     weight: 3, opacity: 0.6, dashArray: '4, 4' 
                 }).addTo(map);
             }
@@ -528,7 +559,9 @@ let timer = null;
 
 async function updateLoop() {
     if (stopped) return;
-    await fetchData();
+    if (!isManualSimulation) {
+        await fetchData();
+    }
     if (!stopped) {
         timer = setTimeout(updateLoop, 10000); 
     }
