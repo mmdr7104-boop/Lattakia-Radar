@@ -75,7 +75,7 @@
   <div class="header-titles">
     <div class="title-right">
       <div class="main-title">مطار اللاذقية الدولي</div>
-      <div class="sub-title">نظام الرادار v6.2</div>
+      <div class="sub-title">نظام الرادار v7.0</div>
     </div>
     <div class="title-left">
       <div class="main-title">حركة الطيران المدني</div>
@@ -263,6 +263,7 @@ function popupContent(s) {
   `;
 }
 
+// ** محاولة جلب البيانات من adsb.fi و adsb.lol **
 async function fetchData() {
   if (isFetching) return;
   isFetching = true;
@@ -271,39 +272,47 @@ async function fetchData() {
   txt.textContent = 'جاري...';
   txt.style.color = '#fff';
 
-  const lamin = (config.lat - 1.5).toFixed(2);
-  const lamax = (config.lat + 1.5).toFixed(2);
-  const lomin = (config.lng - 1.5).toFixed(2);
-  const lomax = (config.lng + 1.5).toFixed(2);
+  const nmRadius = Math.round(config.radius * 0.539957);
+  
+  const sources = [
+    { name: 'adsb.fi', url: `https://opendata.adsb.fi/api/v2/point/${config.lat}/${config.lng}/${nmRadius}` },
+    { name: 'adsb.lol', url: `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${nmRadius}` }
+  ];
 
-  const apiUrl = `https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`;
+  let success = false;
 
-  try {
-    const res = await fetch(apiUrl, { cache: 'no-store' });
-    if (!res.ok) throw new Error(`HTTP Status: ${res.status}`);
-    
-    const data = await res.json();
-    dot.classList.add('live'); 
-    txt.textContent = 'مباشر - OpenSky'; 
-    txt.style.color = '#00e676';
-    
-    const states = (data.states || []).map(s => ({
-      hex: s[0], flight: s[1], lon: s[5], lat: s[6],
-      alt_baro: s[7] ? s[7] * 3.28084 : (s[13] ? s[13] * 3.28084 : 0),
-      gs: s[9] ? s[9] * 1.94384 : 0, track: s[10] || 0,
-      squawk: s[14], velocity_ms: s[9] || 0
-    }));
+  for (let i = 0; i < sources.length; i++) {
+    try {
+      const res = await fetch(sources[i].url, { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      
+      dot.classList.add('live'); 
+      txt.textContent = 'مباشر - ' + sources[i].name; 
+      txt.style.color = '#00e676';
+      
+      const states = (data.ac || []).map(s => ({
+        hex: s.hex, flight: s.flight, lat: s.lat, lon: s.lon,
+        alt_baro: s.alt_baro, gs: s.gs, track: s.track, squawk: s.squawk,
+        velocity_ms: (s.gs || 0) / 1.94384
+      }));
 
-    updateAircraftData(states);
-    
-  } catch (err) {
-    console.error(err);
+      updateAircraftData(states);
+      success = true;
+      break;
+      
+    } catch (err) {
+      console.warn('فشل المصدر:', sources[i].name, err);
+    }
+  }
+
+  if (!success) {
     dot.classList.remove('live'); 
     txt.textContent = 'فشل الاتصال'; 
     txt.style.color = '#ff4444';
-  } finally {
-    isFetching = false;
   }
+  
+  isFetching = false;
 }
 
 function updateAircraftData(states) {
@@ -433,7 +442,7 @@ async function updateLoop() {
     if (stopped) return;
     await fetchData();
     if (!stopped) {
-        timer = setTimeout(updateLoop, 10000); // ** التحديث كل 10 ثواني (سينمائي) **
+        timer = setTimeout(updateLoop, 10000); 
     }
 }
 
