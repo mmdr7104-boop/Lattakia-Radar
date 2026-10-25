@@ -29,9 +29,10 @@
   #status-dot.live { background: #00e676; animation: pulse 2s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
+  /* لوحة المصادر عاليسار */
   #left-sources {
       position: absolute; top: 160px; left: 10px; z-index: 1000;
-      background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px;
+      background: rgba(0,0,0,0.6); padding: 10px; border-radius: 8px;
       display: flex; flex-direction: column; gap: 8px; 
       border: 1px solid rgba(255,255,255,0.1);
       pointer-events: none;
@@ -44,6 +45,7 @@
 
   #debug-panel { display: none; position: absolute; top: 110px; right: 10px; z-index: 1000; background: rgba(0,0,0,0.85); color: #00e676; padding: 10px; font-family: monospace; font-size: 12px; border-radius: 5px; border: 1px solid #00e676; direction: ltr; pointer-events: none; box-shadow: 0 0 10px rgba(0,230,118,0.3); line-height: 1.4; }
   
+  /* القائمة السفلية */
   #sources { position: absolute; bottom: 0; left: 0; right: 0; z-index: 1000; background: linear-gradient(135deg, #0a1628 0%, #1a2f4a 100%); border-radius: 16px 16px 0 0; color: #fff; padding: 12px 12px 20px; box-shadow: 0 -4px 20px rgba(0,0,0,0.4); transition: transform 0.3s ease; }
   #sources.collapsed { transform: translateY(calc(100% - 45px)); }
   #sources-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; cursor: pointer; }
@@ -63,6 +65,7 @@
   .top-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 6px 8px; color: #fff; font-size: 14px; cursor: pointer; font-family: inherit; transition: opacity 0.2s; display: flex; justify-content: center; align-items: center; }
   .top-btn:active { transform: scale(0.95); }
   .top-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  
   #settings-modal { position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; padding: 20px; }
   #settings-modal.show { display: flex; }
   #settings-content { background: #1a2f4a; color: #fff; border-radius: 16px; padding: 20px; width: 100%; max-width: 400px; max-height: 90vh; overflow-y: auto; }
@@ -79,7 +82,10 @@
   .popup-title { font-size: 15px; font-weight: 700; color: #00e676; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); }
   .popup-row { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; }
   .popup-row .label { opacity: 0.6; } .popup-row .value { font-weight: 500; }
-  .leaflet-control-zoom { margin-top: 80px !important; margin-left: 10px !important; margin-right: auto !important; }
+  
+  /* ** أزرار التكبير عاليمين عشان ما تغطي على لوحة المصادر ** */
+  .leaflet-control-zoom { margin-top: 80px !important; margin-right: 10px !important; margin-left: auto !important; }
+
   .ring-label-marker { background: transparent; border: none; box-shadow: none; color: #82a5c1; font-size: 11px; font-family: monospace; font-weight: bold; text-shadow: 1px 1px 2px #000, -1px -1px 2px #000; white-space: nowrap; margin-left: 50%; transform: translateX(-50%); }
   .waypoint-label { color: #ffa726; font-size: 10px; font-weight: bold; font-family: monospace; text-shadow: 1px 1px 2px #000; white-space: nowrap; }
 </style>
@@ -100,7 +106,7 @@
   <div class="header-titles">
     <div class="title-right">
       <div class="main-title">مطار اللاذقية الدولي</div>
-      <div class="sub-title">نظام الرادار v12.2</div>
+      <div class="sub-title">نظام الرادار v13.0</div>
     </div>
     <div class="title-left">
       <div class="main-title">حركة الطيران المدني</div>
@@ -363,9 +369,11 @@ async function fetchData() {
   txt.style.color = '#fff';
 
   const nmRadius = Math.round(config.radius * 0.539957);
+  
+  // ** تم تبديل الترتيب: adsb.lol أولاً، ثم adsb.fi **
   const sources = [
-    { name: 'adsb.fi', url: `https://opendata.adsb.fi/api/v2/point/${config.lat}/${config.lng}/${nmRadius}` },
-    { name: 'adsb.lol', url: `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${nmRadius}` }
+    { name: 'adsb.lol', url: `https://api.adsb.lol/v2/point/${config.lat}/${config.lng}/${nmRadius}` },
+    { name: 'adsb.fi', url: `https://opendata.adsb.fi/api/v2/point/${config.lat}/${config.lng}/${nmRadius}` }
   ];
 
   let success = false;
@@ -483,7 +491,6 @@ setInterval(() => {
         if (state.velocity > 0 && !state.onGround) {
             let distance = state.velocity * dt; 
             
-            // ** زيادة مضاعف السرعة في المحاكاة عشان المسار يبان **
             if (isManualSimulation && icao24.startsWith('demo')) {
                 distance *= 20; 
             }
@@ -500,7 +507,7 @@ setInterval(() => {
             const trailData = aircraftTrails.get(icao24);
             trailData.points.push([state.lat, state.lon]);
             
-            // ** زيادة عدد النقاط إلى 200 عشان يطول المسار وتبين الحركة بوضوح **
+            // عدد النقاط 200 عشان يطول المسار
             if (trailData.points.length > 200) trailData.points.shift();
             
             if (trailData.line) {
