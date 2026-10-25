@@ -100,7 +100,7 @@
   <div class="header-titles">
     <div class="title-right">
       <div class="main-title">مطار اللاذقية الدولي</div>
-      <div class="sub-title">نظام الرادار v14.2</div>
+      <div class="sub-title">نظام الرادار v14.3</div>
     </div>
     <div class="title-left">
       <div class="main-title">حركة الطيران المدني</div>
@@ -161,7 +161,6 @@
 </div>
 
 <script>
-// ** الرابط الجديد لـ Deno (OpenSky) **
 const API_BASE = 'https://wide-crane-2295.mmdr7104-boop.deno.net';
 
 const DEFAULT_CONFIG = { name: 'مطار اللاذقية الدولي', lat: 35.4011, lng: 35.9486, radius: 250, ringInterval: 50, showRings: true, darkMap: false, showAirways: true };
@@ -252,8 +251,10 @@ refreshBtn.addEventListener('click', () => { fetchData(); });
 function clearCache() { localStorage.clear(); sessionStorage.clear(); window.location.replace(window.location.pathname + '?v=' + Date.now()); }
 
 const aircraftMarkers = new Map();
+const aircraftStates = new Map();
 let isFetching = false;
 let isManualSimulation = false;
+let simPlanes = [];
 
 function aircraftIcon(heading, onGround) {
   const color = onGround ? '#ffa726' : '#00e676';
@@ -288,17 +289,19 @@ function popupContent(s) {
   `;
 }
 
-function generateDemoData() {
-    const demoPlanes = [];
-    for (let i = 0; i < 15; i++) {
-        demoPlanes.push({
-            hex: "demo" + i, flight: "SIM" + Math.floor(Math.random() * 9000),
-            lat: config.lat + (Math.random() - 0.5) * 4, lon: config.lng + (Math.random() - 0.5) * 4,
-            alt_baro: 30000 + Math.random() * 5000, gs: 400 + Math.random() * 100,
-            track: Math.random() * 360, squawk: "1234"
-        });
-    }
-    return demoPlanes;
+function createSimPlane() {
+    return {
+        hex: "sim" + Math.floor(Math.random() * 99999),
+        flight: "SIM" + Math.floor(Math.random() * 9000),
+        lat: config.lat + (Math.random() - 0.5) * 4,
+        lon: config.lng + (Math.random() - 0.5) * 4,
+        alt_baro: 30000 + Math.random() * 5000,
+        gs: 400 + Math.random() * 100,
+        track: Math.random() * 360,
+        squawk: "1234",
+        lastUpdate: Date.now(),
+        isDemo: true
+    };
 }
 
 function updateSourceLights(mode) {
@@ -319,16 +322,29 @@ toggleSimBtn.addEventListener('click', () => {
         statusTxt.textContent = 'وضع المحاكاة (يدوي)';
         statusTxt.style.color = '#ffa726';
         document.getElementById('status-dot').classList.add('live');
-        for (const m of aircraftMarkers.values()) map.removeLayer(m);
+        
+        // Clear everything
+        aircraftMarkers.forEach(m => map.removeLayer(m));
         aircraftMarkers.clear();
+        aircraftStates.clear();
+        simPlanes = [];
+        
+        // Initialize simulation planes
+        for(let i=0; i<15; i++) {
+             const p = createSimPlane();
+             simPlanes.push(p);
+             aircraftStates.set(p.hex, p);
+        }
         updateSourceLights('sim');
-        const demoPlanes = generateDemoData();
-        updateAircraftData(demoPlanes, true);
     } else {
         toggleSimBtn.style.background = 'rgba(255,255,255,0.1)';
         toggleSimBtn.style.color = '#ffa726';
-        for (const m of aircraftMarkers.values()) map.removeLayer(m);
+        
+        aircraftMarkers.forEach(m => map.removeLayer(m));
         aircraftMarkers.clear();
+        aircraftStates.clear();
+        simPlanes = [];
+        
         fetchData();
     }
 });
@@ -359,7 +375,7 @@ async function fetchData() {
       txt.textContent = `حي (${planes.length})`;
       txt.style.color = '#00e676';
     }
-    updateAircraftData(planes, false);
+    updateAircraftData(planes);
   } catch (err) {
     console.error('Fetch failed:', err);
     updateSourceLights('fail');
@@ -370,34 +386,128 @@ async function fetchData() {
   }
 }
 
-function updateAircraftData(planes, isDemo) {
+function updateAircraftData(planes) {
   const currentHexes = new Set();
   planes.forEach(plane => {
     if (!plane.lat || !plane.lon) return; 
     const hex = plane.hex;
     currentHexes.add(hex);
-    if (aircraftMarkers.has(hex)) {
-      const marker = aircraftMarkers.get(hex);
-      marker.setLatLng([plane.lat, plane.lon]);
-      marker.setIcon(aircraftIcon(plane.track, plane.alt_baro === 'ground'));
-      marker.setPopupContent(popupContent(plane));
-    } else {
+    
+    if (!aircraftStates.has(hex)) {
+      aircraftStates.set(hex, { ...plane, lastUpdate: Date.now(), isDemo: false });
       const marker = L.marker([plane.lat, plane.lon], { icon: aircraftIcon(plane.track, plane.alt_baro === 'ground') }).addTo(map);
       marker.bindPopup(popupContent(plane));
       aircraftMarkers.set(hex, marker);
+    } else {
+      const state = aircraftStates.get(hex);
+      // Sync exact coordinates
+      state.lat = plane.lat;
+      state.lon = plane.lon;
+      state.gs = plane.gs || state.gs;
+      state.track = plane.track || state.track;
+      state.alt_baro = plane.alt_baro !== undefined ? plane.alt_baro : state.alt_baro;
+      state.flight = plane.flight || state.flight;
+      state.squawk = plane.squawk !== undefined ? plane.squawk : state.squawk;
+      state.lastUpdate = Date.now();
+      
+      if (aircraftMarkers.has(hex)) {
+        const marker = aircraftMarkers.get(hex);
+        marker.setLatLng([state.lat, state.lon]);
+        marker.setIcon(aircraftIcon(state.track, state.alt_baro === 'ground'));
+        marker.setPopupContent(popupContent(state));
+      }
     }
   });
-  for (const [hex, marker] of aircraftMarkers.entries()) {
-    if (!currentHexes.has(hex)) {
-      map.removeLayer(marker);
-      aircraftMarkers.delete(hex);
+  
+  // Clean up disappeared planes
+  for (const [hex, state] of aircraftStates.entries()) {
+    if (!currentHexes.has(hex) && !state.isDemo) {
+      if (aircraftMarkers.has(hex)) {
+        map.removeLayer(aircraftMarkers.get(hex));
+        aircraftMarkers.delete(hex);
+      }
+      aircraftStates.delete(hex);
     }
   }
 }
 
 drawCenter();
 
-// تحديث تلقائي كل 30 ثانية لتجنب حظر OpenSky
+// 🌟 هذا هو محرك الحركة (Animation Loop) الذي يعمل كل ثانية
+setInterval(() => {
+    if (isManualSimulation) {
+        // 1. حركة طائرات المحاكاة
+        simPlanes.forEach(plane => {
+            const speed_ms = plane.gs * 0.514444;
+            const distance = speed_ms * 1; // مسافة الثانية الواحدة
+            const R = 6371000;
+            const bearing = plane.track * Math.PI / 180;
+            const lat1 = plane.lat * Math.PI / 180;
+            const lon1 = plane.lon * Math.PI / 180;
+            const d = distance / R;
+            const lat2 = Math.asin(Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(bearing));
+            const lon2 = lon1 + Math.atan2(Math.sin(bearing) * Math.sin(d) * Math.cos(lat1), Math.cos(d) - Math.sin(lat1) * Math.sin(lat2));
+            
+            plane.lat = lat2 * 180 / Math.PI;
+            plane.lon = lon2 * 180 / Math.PI;
+
+            // إذا خرجت الطائرة عن نطاق الرادار، نعيد توليدها عشوائياً
+            const distFromCenter = distanceKm(config.lat, config.lng, plane.lat, plane.lon);
+            if (distFromCenter > config.radius) {
+                plane.lat = config.lat + (Math.random() - 0.5) * 2;
+                plane.lon = config.lng + (Math.random() - 0.5) * 2;
+                plane.track = Math.random() * 360;
+            }
+
+            if (aircraftMarkers.has(plane.hex)) {
+                const marker = aircraftMarkers.get(plane.hex);
+                marker.setLatLng([plane.lat, plane.lon]);
+                marker.setIcon(aircraftIcon(plane.track, false));
+                marker.setPopupContent(popupContent(plane));
+            } else {
+                const marker = L.marker([plane.lat, plane.lon], { icon: aircraftIcon(plane.track, false) }).addTo(map);
+                marker.bindPopup(popupContent(plane));
+                aircraftMarkers.set(plane.hex, marker);
+            }
+        });
+    } else {
+        // 2. حركة الطائرات الحقيقية (Dead Reckoning)
+        aircraftStates.forEach((plane, hex) => {
+            if (plane.isDemo) return; // تخطي طائرات المحاكاة
+            const now = Date.now();
+            const dt = (now - plane.lastUpdate) / 1000;
+            
+            if (dt > 300) { // إزالة الطائرة إذا انقطع اتصالها لأكثر من 5 دقائق
+                if (aircraftMarkers.has(hex)) { map.removeLayer(aircraftMarkers.get(hex)); aircraftMarkers.delete(hex); }
+                aircraftStates.delete(hex);
+                return;
+            }
+
+            if (dt > 0 && plane.gs > 0) {
+                const speed_ms = plane.gs * 0.514444;
+                const distance = speed_ms * dt;
+                const R = 6371000;
+                const bearing = (plane.track || 0) * Math.PI / 180;
+                const lat1 = plane.lat * Math.PI / 180;
+                const lon1 = plane.lon * Math.PI / 180;
+                const d = distance / R;
+                const lat2 = Math.asin(Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(bearing));
+                const lon2 = lon1 + Math.atan2(Math.sin(bearing) * Math.sin(d) * Math.cos(lat1), Math.cos(d) - Math.sin(lat1) * Math.sin(lat2));
+                
+                plane.lat = lat2 * 180 / Math.PI;
+                plane.lon = lon2 * 180 / Math.PI;
+                plane.lastUpdate = now;
+                
+                if (aircraftMarkers.has(hex)) {
+                    const marker = aircraftMarkers.get(hex);
+                    marker.setLatLng([plane.lat, plane.lon]);
+                }
+            }
+        });
+    }
+}, 1000); // تحديث الحركة كل ثانية
+
+// التحديث من السيرفر كل 30 ثانية
 setInterval(() => {
   if (!isManualSimulation && !document.hidden) fetchData();
 }, 30000);
