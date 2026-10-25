@@ -100,7 +100,7 @@
   <div class="header-titles">
     <div class="title-right">
       <div class="main-title">مطار اللاذقية الدولي</div>
-      <div class="sub-title">نظام الرادار v14.1</div>
+      <div class="sub-title">نظام الرادار v14.2</div>
     </div>
     <div class="title-left">
       <div class="main-title">حركة الطيران المدني</div>
@@ -161,7 +161,7 @@
 </div>
 
 <script>
-// ** الرابط الجديد لـ Deno Deploy **
+// ** الرابط الجديد لـ Deno (OpenSky) **
 const API_BASE = 'https://wide-crane-2295.mmdr7104-boop.deno.net';
 
 const DEFAULT_CONFIG = { name: 'مطار اللاذقية الدولي', lat: 35.4011, lng: 35.9486, radius: 250, ringInterval: 50, showRings: true, darkMap: false, showAirways: true };
@@ -292,30 +292,20 @@ function generateDemoData() {
     const demoPlanes = [];
     for (let i = 0; i < 15; i++) {
         demoPlanes.push({
-            hex: "demo" + i,
-            flight: "SIM" + Math.floor(Math.random() * 9000),
-            lat: config.lat + (Math.random() - 0.5) * 4,
-            lon: config.lng + (Math.random() - 0.5) * 4,
-            alt_baro: 30000 + Math.random() * 5000,
-            gs: 400 + Math.random() * 100,
-            track: Math.random() * 360,
-            squawk: "1234"
+            hex: "demo" + i, flight: "SIM" + Math.floor(Math.random() * 9000),
+            lat: config.lat + (Math.random() - 0.5) * 4, lon: config.lng + (Math.random() - 0.5) * 4,
+            alt_baro: 30000 + Math.random() * 5000, gs: 400 + Math.random() * 100,
+            track: Math.random() * 360, squawk: "1234"
         });
     }
     return demoPlanes;
 }
 
 function updateSourceLights(mode) {
-    document.querySelectorAll('#left-sources .dot').forEach(dot => {
-        dot.classList.remove('active', 'sim', 'fail');
-    });
-    if (mode === 'live') {
-        document.getElementById('src-internet').querySelector('.dot').classList.add('active');
-    } else if (mode === 'sim') {
-        document.getElementById('src-internet').querySelector('.dot').classList.add('sim');
-    } else if (mode === 'fail') {
-        document.getElementById('src-internet').querySelector('.dot').classList.add('fail');
-    }
+    document.querySelectorAll('#left-sources .dot').forEach(dot => { dot.classList.remove('active', 'sim', 'fail'); });
+    if (mode === 'live') document.getElementById('src-internet').querySelector('.dot').classList.add('active');
+    else if (mode === 'sim') document.getElementById('src-internet').querySelector('.dot').classList.add('sim');
+    else if (mode === 'fail') document.getElementById('src-internet').querySelector('.dot').classList.add('fail');
 }
 
 const toggleSimBtn = document.getElementById('toggle-sim-btn');
@@ -329,20 +319,16 @@ toggleSimBtn.addEventListener('click', () => {
         statusTxt.textContent = 'وضع المحاكاة (يدوي)';
         statusTxt.style.color = '#ffa726';
         document.getElementById('status-dot').classList.add('live');
-        
         for (const m of aircraftMarkers.values()) map.removeLayer(m);
         aircraftMarkers.clear();
-
         updateSourceLights('sim');
         const demoPlanes = generateDemoData();
         updateAircraftData(demoPlanes, true);
     } else {
         toggleSimBtn.style.background = 'rgba(255,255,255,0.1)';
         toggleSimBtn.style.color = '#ffa726';
-        
         for (const m of aircraftMarkers.values()) map.removeLayer(m);
         aircraftMarkers.clear();
-        
         fetchData();
     }
 });
@@ -365,15 +351,14 @@ async function fetchData() {
     const planes = data.ac || [];
 
     if (planes.length === 0) {
-      updateSourceLights('fail');
-      txt.textContent = 'لا طائرات';
-      txt.style.color = '#ffa726';
+      updateSourceLights('live');
+      txt.textContent = 'السماء صافية (0)';
+      txt.style.color = '#82a5c1';
     } else {
       updateSourceLights('live');
       txt.textContent = `حي (${planes.length})`;
       txt.style.color = '#00e676';
     }
-
     updateAircraftData(planes, false);
   } catch (err) {
     console.error('Fetch failed:', err);
@@ -385,31 +370,23 @@ async function fetchData() {
   }
 }
 
-// دالة تحديث الطائرات على الخريطة
 function updateAircraftData(planes, isDemo) {
   const currentHexes = new Set();
-
   planes.forEach(plane => {
     if (!plane.lat || !plane.lon) return; 
     const hex = plane.hex;
     currentHexes.add(hex);
-
     if (aircraftMarkers.has(hex)) {
       const marker = aircraftMarkers.get(hex);
-      // حركة سلسة إذا كانت البيانات حقيقية
       marker.setLatLng([plane.lat, plane.lon]);
       marker.setIcon(aircraftIcon(plane.track, plane.alt_baro === 'ground'));
       marker.setPopupContent(popupContent(plane));
     } else {
-      const marker = L.marker([plane.lat, plane.lon], {
-        icon: aircraftIcon(plane.track, plane.alt_baro === 'ground')
-      }).addTo(map);
+      const marker = L.marker([plane.lat, plane.lon], { icon: aircraftIcon(plane.track, plane.alt_baro === 'ground') }).addTo(map);
       marker.bindPopup(popupContent(plane));
       aircraftMarkers.set(hex, marker);
     }
   });
-
-  // مسح الطائرات التي اختفت
   for (const [hex, marker] of aircraftMarkers.entries()) {
     if (!currentHexes.has(hex)) {
       map.removeLayer(marker);
@@ -418,24 +395,19 @@ function updateAircraftData(planes, isDemo) {
   }
 }
 
-// تشغيل الرادار
 drawCenter();
 
-// تحديث تلقائي كل 5 ثوانٍ
+// تحديث تلقائي كل 30 ثانية لتجنب حظر OpenSky
 setInterval(() => {
   if (!isManualSimulation && !document.hidden) fetchData();
-}, 5000);
+}, 30000);
 
-// أول جلب فوري
 fetchData();
 
-// إعدادات
 document.getElementById('settings-btn').addEventListener('click', () => {
   document.getElementById('settings-modal').classList.add('show');
 });
-function closeSettings() {
-  document.getElementById('settings-modal').classList.remove('show');
-}
+function closeSettings() { document.getElementById('settings-modal').classList.remove('show'); }
 function saveSettings() {
   config.name = document.getElementById('input-name').value;
   config.lat = parseFloat(document.getElementById('input-lat').value);
@@ -448,9 +420,7 @@ function saveSettings() {
   drawCenter();
   fetchData();
 }
-function toggleSources() {
-  document.getElementById('sources').classList.toggle('collapsed');
-}
+function toggleSources() { document.getElementById('sources').classList.toggle('collapsed'); }
 </script>
 </body>
 </html>
