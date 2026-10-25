@@ -29,7 +29,6 @@
   #status-dot.live { background: #00e676; animation: pulse 2s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
-  /* لوحة المصادر الصغيرة عاليسار (خط خفيف + لمبة) */
   #left-sources {
       position: absolute; top: 110px; left: 10px; z-index: 1000;
       background: rgba(0,0,0,0.4); padding: 8px 10px; border-radius: 6px;
@@ -37,26 +36,13 @@
       border: 1px solid rgba(255,255,255,0.08);
       pointer-events: none;
   }
-  .source-item {
-      display: flex; align-items: center; gap: 6px;
-      font-size: 10px; color: rgba(255,255,255,0.7); font-family: monospace;
-  }
-  .source-item .dot {
-      width: 6px; height: 6px; border-radius: 50%; background: #555; transition: all 0.3s;
-  }
-  .source-item .dot.active {
-      background: #00e676; box-shadow: 0 0 6px #00e676;
-  }
+  .source-item { display: flex; align-items: center; gap: 6px; font-size: 10px; color: rgba(255,255,255,0.7); font-family: monospace; }
+  .source-item .dot { width: 6px; height: 6px; border-radius: 50%; background: #555; transition: all 0.3s; }
+  .source-item .dot.active { background: #00e676; box-shadow: 0 0 6px #00e676; }
 
   #debug-panel { display: none; position: absolute; top: 110px; right: 10px; z-index: 1000; background: rgba(0,0,0,0.85); color: #00e676; padding: 10px; font-family: monospace; font-size: 12px; border-radius: 5px; border: 1px solid #00e676; direction: ltr; pointer-events: none; box-shadow: 0 0 10px rgba(0,230,118,0.3); line-height: 1.4; }
   
-  /* ** القائمة السفلية (المصادر) ** */
-  #sources {
-    position: absolute; bottom: 0; left: 0; right: 0; z-index: 1000;
-    background: linear-gradient(135deg, #0a1628 0%, #1a2f4a 100%);
-    border-radius: 16px 16px 0 0; color: #fff; padding: 12px 12px 20px;
-    box-shadow: 0 -4px 20px rgba(0,0,0,0.4); transition: transform 0.3s ease;
-  }
+  #sources { position: absolute; bottom: 0; left: 0; right: 0; z-index: 1000; background: linear-gradient(135deg, #0a1628 0%, #1a2f4a 100%); border-radius: 16px 16px 0 0; color: #fff; padding: 12px 12px 20px; box-shadow: 0 -4px 20px rgba(0,0,0,0.4); transition: transform 0.3s ease; }
   #sources.collapsed { transform: translateY(calc(100% - 45px)); }
   #sources-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; cursor: pointer; }
   #sources-header .title { font-size: 13px; font-weight: 600; }
@@ -101,24 +87,17 @@
 <div id="map"></div>
 <div id="debug-panel"></div>
 
-<!-- لوحة المصادر الصغيرة عاليسار -->
 <div id="left-sources">
-    <div class="source-item" id="src-adsbfi">
-        <div class="dot"></div> <div>adsb.fi</div>
-    </div>
-    <div class="source-item" id="src-adsblol">
-        <div class="dot"></div> <div>adsb.lol</div>
-    </div>
-    <div class="source-item" id="src-sim">
-        <div class="dot"></div> <div>محاكاة</div>
-    </div>
+    <div class="source-item" id="src-adsbfi"><div class="dot"></div> <div>adsb.fi</div></div>
+    <div class="source-item" id="src-adsblol"><div class="dot"></div> <div>adsb.lol</div></div>
+    <div class="source-item" id="src-sim"><div class="dot"></div> <div>محاكاة</div></div>
 </div>
 
 <div id="topbar">
   <div class="header-titles">
     <div class="title-right">
       <div class="main-title">مطار اللاذقية الدولي</div>
-      <div class="sub-title">نظام الرادار v9.3</div>
+      <div class="sub-title">نظام الرادار v10.1</div>
     </div>
     <div class="title-left">
       <div class="main-title">حركة الطيران المدني</div>
@@ -135,7 +114,6 @@
   </div>
 </div>
 
-<!-- القائمة السفلية للأزرار -->
 <div id="sources" class="collapsed">
   <div id="sources-header" onclick="toggleSources()">
     <div style="width:40px;"></div>
@@ -397,31 +375,33 @@ function updateAircraftData(states) {
     seen.add(icao24);
     
     if (!isDemoMode) {
-        aircraftStates.set(icao24, {
-          lat: s.lat, lon: s.lon, velocity: s.velocity_ms, track: s.track,
-          onGround: s.alt_baro === 'ground' || s.alt_baro === 0,
-          data: s
-        });
+        const state = aircraftStates.get(icao24);
+        if (state) {
+            // ** منع الارتداد (Anti-Snapping) **
+            // إذا تغير مكان السيرفر عن آخر مكان سجله، نحدث المكان
+            if (!state.serverLat || !state.serverLon || Math.abs(state.serverLat - s.lat) > 0.0001 || Math.abs(state.serverLon - s.lon) > 0.0001) {
+                state.lat = s.lat; 
+                state.lon = s.lon;
+                state.serverLat = s.lat;
+                state.serverLon = s.lon;
+            }
+            state.velocity = s.velocity_ms;
+            state.track = s.track;
+            state.data = s;
+        } else {
+            aircraftStates.set(icao24, {
+              lat: s.lat, lon: s.lon, serverLat: s.lat, serverLon: s.lon,
+              velocity: s.velocity_ms, track: s.track,
+              onGround: s.alt_baro === 'ground' || s.alt_baro === 0, data: s
+            });
+        }
     } else {
         if (!aircraftStates.has(icao24)) {
             aircraftStates.set(icao24, {
               lat: s.lat, lon: s.lon, velocity: s.velocity_ms, track: s.track,
-              onGround: s.alt_baro === 'ground' || s.alt_baro === 0,
-              data: s
+              onGround: s.alt_baro === 'ground' || s.alt_baro === 0, data: s
             });
         }
-    }
-
-    if (!aircraftTrails.has(icao24)) aircraftTrails.set(icao24, { points: [], line: null });
-    const trailData = aircraftTrails.get(icao24);
-    const lastPoint = trailData.points[trailData.points.length - 1];
-    
-    if (!lastPoint || (lastPoint[0] !== s.lat || lastPoint[1] !== s.lon)) {
-      trailData.points.push([s.lat, s.lon]);
-      if (trailData.points.length > 50) trailData.points.shift();
-
-      if (trailData.line) trailData.line.setLatLngs(trailData.points);
-      else trailData.line = L.polyline(trailData.points, { color: s.hex.startsWith('demo') ? '#ffa726' : '#00e676', weight: 3, opacity: 0.6, dashArray: '4, 4' }).addTo(map);
     }
 
     if (!aircraftMarkers.has(icao24)) {
@@ -444,9 +424,6 @@ function updateAircraftData(states) {
       aircraftMarkers.set(icao24, m);
     } else {
       const m = aircraftMarkers.get(icao24);
-      if(!isDemoMode) {
-          m.setLatLng([s.lat, s.lon]);
-      }
       m.setIcon(aircraftIcon(s.track, s.alt_baro === 'ground'));
       m.setPopupContent(popupContent(s));
     }
@@ -472,8 +449,12 @@ setInterval(() => {
         if (!marker) return;
 
         if (state.velocity > 0 && !state.onGround) {
-            // ** الحركة الحقيقية 100% (بدون مضاعف) **
             let distance = state.velocity * dt; 
+            
+            // ** تسريع الحركة في وضع المحاكاة لتصبح مرئية جداً **
+            if (isDemoMode && icao24.startsWith('demo')) {
+                distance *= 4; 
+            }
 
             const trackRad = state.track * Math.PI / 180;
             const latRad = state.lat * Math.PI / 180;
@@ -485,13 +466,19 @@ setInterval(() => {
             
             marker.setLatLng([state.lat, state.lon]);
 
-            if (isDemoMode && icao24.startsWith('demo')) {
-                if (!aircraftTrails.has(icao24)) aircraftTrails.set(icao24, { points: [], line: null });
-                const trailData = aircraftTrails.get(icao24);
-                trailData.points.push([state.lat, state.lon]);
-                if (trailData.points.length > 50) trailData.points.shift();
-                if (trailData.line) trailData.line.setLatLngs(trailData.points);
-                else trailData.line = L.polyline(trailData.points, { color: '#ffa726', weight: 3, opacity: 0.6, dashArray: '4, 4' }).addTo(map);
+            // ** رسم المسار المستمر لكل الطيارات (حقيقية ومحاكاة) **
+            if (!aircraftTrails.has(icao24)) aircraftTrails.set(icao24, { points: [], line: null });
+            const trailData = aircraftTrails.get(icao24);
+            trailData.points.push([state.lat, state.lon]);
+            if (trailData.points.length > 50) trailData.points.shift();
+            
+            if (trailData.line) {
+                trailData.line.setLatLngs(trailData.points);
+            } else {
+                trailData.line = L.polyline(trailData.points, { 
+                    color: isDemoMode ? '#ffa726' : '#00e676', 
+                    weight: 3, opacity: 0.6, dashArray: '4, 4' 
+                }).addTo(map);
             }
         }
         
